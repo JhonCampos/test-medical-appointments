@@ -28,7 +28,8 @@ custom:
 
 functions:
   processPE:
-    handler: src/handlers/process.handler
+    # Apuntamos al nuevo handler para Perú
+    handler: src/handlers/processPE.handler
     events:
       - sqs:
           arn:
@@ -40,7 +41,8 @@ functions:
                 - "appointments-queue-pe-${self:provider.stage}"
 
   processCL:
-    handler: src/handlers/process.handler
+    # Apuntamos al nuevo handler para Chile
+    handler: src/handlers/processCL.handler
     events:
       - sqs:
           arn:

@@ -2,7 +2,9 @@ import { createContainer, asClass, InjectionMode } from 'awilix';
 import { CreateAppointmentUseCase } from '@core/application/use-cases/CreateAppointment';
 import { ListAppointmentsUseCase } from '@core/application/use-cases/ListAppointments';
 import { UpdateAppointmentStatusUseCase } from '@core/application/use-cases/UpdateAppointmentStatus';
-import { ProcessAppointmentUseCase } from '@core/application/use-cases/ProcessAppointment';
+// Importamos los nuevos casos de uso
+import { ProcessAppointmentPEUseCase } from '@core/application/use-cases/ProcessAppointmentPE';
+import { ProcessAppointmentCLUseCase } from '@core/application/use-cases/ProcessAppointmentCL';
 import { DynamoDbAppointmentRepository } from '../persistence/dynamodb/AppointmentRepository';
 import { SnsEventPublisher } from '../messaging/SnsEventPublisher';
 import { AppointmentRdsRepository } from '../persistence/rds/AppointmentRdsRepository';
@@ -12,7 +14,6 @@ const container = createContainer({
   injectionMode: InjectionMode.PROXY,
 });
 
-// Contenedor Centralizado para todos los servicios
 container.register({
   // Repositorios
   appointmentRepository: asClass(DynamoDbAppointmentRepository).singleton(),
@@ -26,7 +27,10 @@ container.register({
   createAppointmentUseCase: asClass(CreateAppointmentUseCase).singleton(),
   listAppointmentsUseCase: asClass(ListAppointmentsUseCase).singleton(),
   updateAppointmentStatusUseCase: asClass(UpdateAppointmentStatusUseCase).singleton(),
-  processAppointmentUseCase: asClass(ProcessAppointmentUseCase).singleton(),
+  
+  // Registramos los nuevos casos de uso específicos y eliminamos el genérico
+  processAppointmentPEUseCase: asClass(ProcessAppointmentPEUseCase).singleton(),
+  processAppointmentCLUseCase: asClass(ProcessAppointmentCLUseCase).singleton(),
 });
 
 export { container };

@@ -1,13 +1,17 @@
 import { CreateAppointmentSchema } from '@core/application/dtos/AppointmentDtos';
 import { lambdaHandlerWrapper } from '@infrastructure/common/LambdaHandlerWrapper';
-// Lógica para inicializar el contenedor de DI (Awilix)
-import { container } from '@infrastructure/dependency-injection/container';
+import { container } from '@infrastructure/di/container';
+import { CreateAppointmentUseCase } from '@core/application/use-cases/CreateAppointment';
+import { validateAndParse } from '@core/common/utils/validation';
 
 async function createAppointmentHandler(event: any) {
   const body = JSON.parse(event.body);
-  const dto = CreateAppointmentSchema.parse(body);
+  
+  // Usamos el nuevo wrapper de validación.
+  // Si la validación falla, lanzará un AppError que será capturado por el lambdaHandlerWrapper.
+  const dto = validateAndParse(CreateAppointmentSchema, body);
 
-  const useCase = container.resolve('createAppointmentUseCase');
+  const useCase = container.resolve<CreateAppointmentUseCase>('createAppointmentUseCase');
   const result = await useCase.execute(dto);
 
   return {

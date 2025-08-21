@@ -77,8 +77,12 @@ export const CreateAppointmentSchema = z.object({
   scheduleId: z.number().int().positive(),
   countryISO: z.enum(['PE', 'CL']),
 });
-
 export type CreateAppointmentDto = z.infer<typeof CreateAppointmentSchema>;
+
+export const ListAppointmentsRequestSchema = z.object({
+  insuredId: z.string().regex(/^[0-9]{5}$/, "El insuredId debe ser de 5 dígitos numéricos."),
+});
+export type ListAppointmentsRequestDto = z.infer<typeof ListAppointmentsRequestSchema>;
 
 export const AppointmentResponseSchema = AppointmentSchema;
 export type AppointmentResponseDto = z.infer<typeof AppointmentResponseSchema>;
@@ -91,6 +95,12 @@ export const SnsAppointmentEventSchema = z.object({
   createdAt: z.string().datetime(),
 });
 export type SnsAppointmentEventDto = z.infer<typeof SnsAppointmentEventSchema>;
+
+export const UpdateAppointmentStatusEventSchema = z.object({
+  appointmentId: z.string().uuid(),
+  insuredId: z.string(),
+  status: z.literal('PROCESSED'),
+});
 
 // ===== Directory: packages/core/src/application/use-cases =====
 
@@ -126,6 +136,121 @@ export class CreateAppointmentUseCase {
     });
     
     return appointment;
+  }
+}// ListAppointments.ts
+import { Appointment } from '../../domain/entities/Appointment';
+import { IAppointmentRepository } from '../../domain/ports/repositories/IAppointmentRepository';
+
+/**
+ * @description Caso de uso para listar citas médicas por el ID del asegurado.
+ */
+export class ListAppointmentsUseCase {
+  /**
+   * @param appointmentRepository El repositorio para acceder a los datos de las citas.
+   */
+  constructor(
+    private readonly appointmentRepository: IAppointmentRepository
+  ) {}
+
+  /**
+   * Ejecuta el caso de uso.
+   * @param insuredId El ID del asegurado.
+   * @returns Una promesa que se resuelve con un arreglo de citas.
+   */
+  async execute(insuredId: string): Promise<Appointment[]> {
+    return this.appointmentRepository.findByInsuredId(insuredId);
+  }
+}// ProcessAppointment.ts
+import { SnsAppointmentEventDto } from '../dtos/AppointmentDtos';
+import { IConfirmationPublisher } from '../../domain/ports/IConfirmationPublisher';
+import { Appointment } from '../../domain/entities/Appointment';
+
+// Creamos una interfaz simple para el repositorio de RDS en la capa de aplicación
+// para no depender directamente de la implementación de infra.
+export interface IAppointmentRdsRepository {
+  save(appointment: Appointment): Promise<void>;
+}
+
+/**
+ * @description Caso de uso para procesar una cita, guardarla en la base de datos
+ * secundaria (RDS) y publicar un evento de confirmación.
+ */
+export class ProcessAppointmentUseCase {
+  constructor(
+    private readonly rdsRepository: IAppointmentRdsRepository,
+    private readonly confirmationPublisher: IConfirmationPublisher
+  ) {}
+
+  /**
+   * Ejecuta el caso de uso.
+   * @param appointmentEvent El DTO del evento recibido de SNS.
+   */
+  async execute(appointmentEvent: SnsAppointmentEventDto): Promise<void> {
+    // 1. Reconstruir la entidad Appointment para la persistencia
+    const appointmentToSave: Appointment = {
+      ...appointmentEvent,
+      status: 'PENDING', // El estado inicial se guarda en RDS
+      updatedAt: new Date(appointmentEvent.createdAt).toISOString(),
+    };
+
+    // 2. Guardar en la base de datos RDS
+    await this.rdsRepository.save(appointmentToSave);
+
+    // 3. Publicar evento de confirmación
+    await this.confirmationPublisher.publish({
+      appointmentId: appointmentToSave.appointmentId,
+      insuredId: appointmentToSave.insuredId,
+      status: 'PROCESSED',
+    });
+  }
+}// UpdateAppointmentStatus.ts
+import { AppointmentEntity } from '../../domain/entities/Appointment';
+import { IAppointmentRepository } from '../../domain/ports/repositories/IAppointmentRepository';
+import { AppError, ErrorCode, HttpStatusCode } from '../../common/errors/AppError';
+
+interface UpdateAppointmentStatusDto {
+  appointmentId: string;
+  insuredId: string;
+}
+
+/**
+ * @description Caso de uso para actualizar el estado de una cita a 'COMPLETED'.
+ */
+export class UpdateAppointmentStatusUseCase {
+  constructor(
+    private readonly appointmentRepository: IAppointmentRepository
+  ) {}
+
+  /**
+   * Ejecuta el caso de uso.
+   * @param dto El DTO con los identificadores de la cita.
+   */
+  async execute(dto: UpdateAppointmentStatusDto): Promise<void> {
+    const { appointmentId, insuredId } = dto;
+
+    // 1. Encontrar la cita existente
+    const existingAppointment = await this.appointmentRepository.findById({ appointmentId, insuredId });
+
+    if (!existingAppointment) {
+      // En un sistema real, podríamos mover este mensaje a una DLQ o registrar una alerta.
+      // Por ahora, lanzamos un error para indicar que la cita no fue encontrada.
+      throw new AppError(
+        `Appointment with ID ${appointmentId} not found.`,
+        ErrorCode.NotFound,
+        HttpStatusCode.NOT_FOUND
+      );
+    }
+    
+    // 2. Rehidratar la entidad de dominio
+    const appointmentEntity = new AppointmentEntity(existingAppointment);
+
+    // 3. Ejecutar la lógica de dominio para completar la cita
+    appointmentEntity.complete();
+
+    // 4. Persistir los cambios usando el repositorio
+    await this.appointmentRepository.update(appointmentEntity.values);
+    
+    console.log(`Appointment ${appointmentId} status updated to COMPLETED.`);
   }
 }
 
@@ -207,7 +332,17 @@ export class AppointmentEntity {
 
 // ===== Directory: packages/core/src/domain/ports =====
 
-// IEventPublisher.ts
+// IConfirmationPublisher.ts
+/**
+ * @description Interfaz para un publicador de eventos de confirmación de procesamiento.
+ */
+export interface IConfirmationPublisher {
+  /**
+   * Publica un evento de confirmación.
+   * @param eventDetail El payload del evento.
+   */
+  publish(eventDetail: Record<string, any>): Promise<void>;
+}// IEventPublisher.ts
 export interface IEventPublisher {
   publish(topic: string, event: Record<string, any>, attributes?: Record<string, any>): Promise<void>;
 }
@@ -219,6 +354,9 @@ import { Appointment } from "../../entities/Appointment";
 
 export interface IAppointmentRepository {
   save(appointment: Appointment): Promise<void>;
+  findById(keys: { appointmentId: string, insuredId: string }): Promise<Appointment | null>; // [!code ++]
+  update(appointment: Appointment): Promise<void>; // [!code ++]
+  findByInsuredId(insuredId: string): Promise<Appointment[]>; // [!code ++]
 }
 
 // ===== Directory: packages/core =====
@@ -307,20 +445,132 @@ export const lambdaHandlerWrapper = (handler: Function) => async (event: any, co
 // ===== Directory: packages/infrastructure/src/di =====
 
 // container.ts
+import { createContainer, asClass, InjectionMode } from 'awilix';
+import { CreateAppointmentUseCase } from '@core/application/use-cases/CreateAppointment';
+import { ListAppointmentsUseCase } from '@core/application/use-cases/ListAppointments';
+import { UpdateAppointmentStatusUseCase } from '@core/application/use-cases/UpdateAppointmentStatus';
+import { ProcessAppointmentUseCase } from '@core/application/use-cases/ProcessAppointment';
+import { DynamoDbAppointmentRepository } from '../persistence/dynamodb/AppointmentRepository';
+import { SnsEventPublisher } from '../messaging/SnsEventPublisher';
+import { AppointmentRdsRepository } from '../persistence/rds/AppointmentRdsRepository';
+import { EventBridgePublisher } from '../messaging/EventBridgePublisher';
 
+const container = createContainer({
+  injectionMode: InjectionMode.PROXY,
+});
+
+// Contenedor Centralizado para todos los servicios
+container.register({
+  // Repositorios
+  appointmentRepository: asClass(DynamoDbAppointmentRepository).singleton(),
+  rdsRepository: asClass(AppointmentRdsRepository).singleton(),
+  
+  // Publicadores de Eventos
+  eventPublisher: asClass(SnsEventPublisher).singleton(),
+  confirmationPublisher: asClass(EventBridgePublisher).singleton(),
+
+  // Casos de Uso
+  createAppointmentUseCase: asClass(CreateAppointmentUseCase).singleton(),
+  listAppointmentsUseCase: asClass(ListAppointmentsUseCase).singleton(),
+  updateAppointmentStatusUseCase: asClass(UpdateAppointmentStatusUseCase).singleton(),
+  processAppointmentUseCase: asClass(ProcessAppointmentUseCase).singleton(),
+});
+
+export { container };
 
 // ===== Directory: packages/infrastructure/src/messaging =====
 
 // EventBridgePublisher.ts
-// SnsEventPublisher.ts
+import { EventBridgeClient, PutEventsCommand } from '@aws-sdk/client-eventbridge';
+import { IConfirmationPublisher } from '@core/domain/ports/IConfirmationPublisher';
 
+/**
+ * @description Publicador de eventos que utiliza AWS EventBridge.
+ */
+export class EventBridgePublisher implements IConfirmationPublisher {
+  private readonly eventBridgeClient: EventBridgeClient;
+  private readonly eventBusName = process.env.EVENT_BUS_NAME!;
+  private readonly eventSource = 'appointment.processor';
+  private readonly eventDetailType = 'AppointmentProcessed';
+
+  constructor() {
+    this.eventBridgeClient = new EventBridgeClient({
+      region: process.env.AWS_REGION || 'us-east-1',
+    });
+  }
+
+  /**
+   * Publica un evento de confirmación en el bus de EventBridge.
+   * @param detail El payload del evento.
+   */
+  async publish(detail: Record<string, any>): Promise<void> {
+    const command = new PutEventsCommand({
+      Entries: [
+        {
+          Source: this.eventSource,
+          DetailType: this.eventDetailType,
+          Detail: JSON.stringify(detail),
+          EventBusName: this.eventBusName,
+        },
+      ],
+    });
+
+    try {
+      await this.eventBridgeClient.send(command);
+      console.log(`Event published successfully to EventBridge bus: ${this.eventBusName}`);
+    } catch (error) {
+      console.error('Error publishing event to EventBridge:', error);
+      throw error;
+    }
+  }
+}// SnsEventPublisher.ts
+import { SNSClient, PublishCommand, MessageAttributeValue } from '@aws-sdk/client-sns';
+import { IEventPublisher } from '@core/domain/ports/IEventPublisher';
+
+/**
+ * @description Implementación de IEventPublisher que publica eventos en un tópico de AWS SNS.
+ */
+export class SnsEventPublisher implements IEventPublisher {
+  private readonly snsClient: SNSClient;
+  private readonly topicArn = process.env.SNS_TOPIC_APPOINTMENTS_ARN!;
+
+  constructor() {
+    this.snsClient = new SNSClient({
+      region: process.env.AWS_REGION || 'us-east-1',
+      endpoint: process.env.IS_OFFLINE ? 'http://localhost:4002' : undefined,
+    });
+  }
+
+  /**
+   * Publica un evento en el tópico SNS configurado.
+   * @param topic El nombre lógico del tema (no se usa directamente, se usa el ARN de la variable de entorno).
+   * @param event El objeto del evento a publicar.
+   * @param attributes Atributos del mensaje para filtrado en SNS.
+   */
+  async publish(topic: string, event: Record<string, any>, attributes?: Record<string, MessageAttributeValue>): Promise<void> {
+    const command = new PublishCommand({
+      TopicArn: this.topicArn,
+      Message: JSON.stringify(event),
+      MessageAttributes: attributes,
+    });
+
+    try {
+      await this.snsClient.send(command);
+      console.log(`Event published successfully to SNS topic: ${this.topicArn}`);
+    } catch (error) {
+      console.error('Error publishing event to SNS:', error);
+      // En un caso real, aquí se podría implementar una estrategia de reintentos o "dead-letter queue".
+      throw error;
+    }
+  }
+}
 
 // ===== Directory: packages/infrastructure/src/persistence/dynamodb =====
 
 // AppointmentRepository.ts
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, PutCommand } from '@aws-sdk/lib-dynamodb';
-import { IAppointmentRepository } from '@core/domain/repositories/IAppointmentRepository';
+import { DynamoDBDocumentClient, PutCommand, QueryCommand, GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
+import { IAppointmentRepository } from '@core/domain/ports/repositories/IAppointmentRepository';
 import { Appointment } from '@core/domain/entities/Appointment';
 
 export class DynamoDbAppointmentRepository implements IAppointmentRepository {
@@ -342,16 +592,110 @@ export class DynamoDbAppointmentRepository implements IAppointmentRepository {
     await this.docClient.send(command);
   }
 
-  // Implementar los otros métodos (update, findById, findByInsuredId)
-  async update(appointment: Appointment): Promise<void> { /* ... */ }
-  async findById(appointmentId: string): Promise<Appointment | null> { /* ... */ return null; }
-  async findByInsuredId(insuredId: string): Promise<Appointment[]> { /* ... */ return []; }
+  async findById(keys: { appointmentId: string; insuredId: string }): Promise<Appointment | null> {
+    const command = new GetCommand({
+      TableName: this.tableName,
+      Key: {
+        insuredId: keys.insuredId,
+        appointmentId: keys.appointmentId,
+      },
+    });
+    const { Item } = await this.docClient.send(command);
+    return (Item as Appointment) || null;
+  }
+
+  async update(appointment: Appointment): Promise<void> {
+    const command = new UpdateCommand({
+      TableName: this.tableName,
+      Key: {
+        insuredId: appointment.insuredId,
+        appointmentId: appointment.appointmentId,
+      },
+      UpdateExpression: 'set #status = :status, updatedAt = :updatedAt',
+      ExpressionAttributeNames: {
+        '#status': 'status', // 'status' es una palabra reservada en DynamoDB
+      },
+      ExpressionAttributeValues: {
+        ':status': appointment.status,
+        ':updatedAt': appointment.updatedAt,
+      },
+    });
+    await this.docClient.send(command);
+  }
+  
+  async findByInsuredId(insuredId: string): Promise<Appointment[]> {
+    const command = new QueryCommand({
+      TableName: this.tableName,
+      KeyConditionExpression: 'insuredId = :insuredId',
+      ExpressionAttributeValues: {
+        ':insuredId': insuredId,
+      },
+    });
+
+    const { Items } = await this.docClient.send(command);
+    return (Items as Appointment[]) || [];
+  }
 }
 
 // ===== Directory: packages/infrastructure/src/persistence/rds =====
 
 // AppointmentRdsRepository.ts
+import { createPool, Pool } from 'mysql2/promise';
+import { Appointment } from '@core/domain/entities/Appointment';
+import { IAppointmentRdsRepository } from '@core/application/use-cases/ProcessAppointment';
 
+/**
+ * @description Repositorio para manejar la persistencia de citas en una base de datos RDS (MySQL).
+ * Asume una tabla `appointments` con la siguiente estructura (o similar):
+ * CREATE TABLE appointments (
+ * appointment_id VARCHAR(36) PRIMARY KEY,
+ * insured_id VARCHAR(5) NOT NULL,
+ * schedule_id INT NOT NULL,
+ * country_iso VARCHAR(2) NOT NULL,
+ * status VARCHAR(10) NOT NULL,
+ * created_at TIMESTAMP NOT NULL
+ * );
+ */
+export class AppointmentRdsRepository implements IAppointmentRdsRepository {
+  private pool: Pool;
+
+  constructor() {
+    this.pool = createPool({
+      host: process.env.RDS_HOST,
+      user: process.env.RDS_USER,
+      password: process.env.RDS_PASSWORD,
+      database: process.env.RDS_DATABASE,
+      waitForConnections: true,
+      connectionLimit: 10,
+      queueLimit: 0,
+    });
+  }
+
+  /**
+   * Guarda una cita en la base de datos MySQL.
+   * @param appointment El objeto de la cita a persistir.
+   */
+  async save(appointment: Appointment): Promise<void> {
+    const sql = `
+      INSERT INTO appointments (appointment_id, insured_id, schedule_id, country_iso, status, created_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `;
+    try {
+      await this.pool.execute(sql, [
+        appointment.appointmentId,
+        appointment.insuredId,
+        appointment.scheduleId,
+        appointment.countryISO,
+        appointment.status,
+        new Date(appointment.createdAt),
+      ]);
+      console.log(`Appointment ${appointment.appointmentId} saved to RDS.`);
+    } catch (error) {
+      console.error('Error saving appointment to RDS:', error);
+      throw new Error('Failed to save appointment to RDS.');
+    }
+  }
+}
 
 // ===== Directory: . =====
 
@@ -377,7 +721,7 @@ provider:
   stage: ${opt:stage, 'dev'}
   environment:
     DYNAMODB_TABLE_APPOINTMENTS: ${self:custom.tableName}
-    SNS_TOPIC_APPOINTMENTS_ARN: { "Fn::GetAtt": ["AppointmentsTopic", "TopicArn"] }
+    SNS_TOPIC_APPOINTMENTS_ARN: { "Ref": "AppointmentsTopic" }
 
 plugins:
   - serverless-esbuild
@@ -408,7 +752,19 @@ functions:
           path: /appointments
           method: post
   
-  # Definir las otras funciones (list, updateStatus)
+  listAppointments:
+    handler: src/handlers/listAppointments.handler
+    events:
+      - httpApi:
+          path: /appointments/{insuredId}
+          method: get
+          
+  updateAppointmentStatus:
+    handler: src/handlers/updateAppointmentStatus.handler
+    events:
+      - sqs:
+          arn:
+            Fn::GetAtt: [AppointmentsCompletionQueue, Arn]
 
 resources:
   Resources:
@@ -433,6 +789,87 @@ resources:
       Properties:
         TopicName: appointments-topic-${self:provider.stage}
 
+    AppointmentsQueuePE:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: appointments-queue-pe-${self:provider.stage}
+
+    AppointmentsQueueCL:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: appointments-queue-cl-${self:provider.stage}
+
+    SnsSubscriptionPE:
+      Type: AWS::SNS::Subscription
+      Properties:
+        Protocol: sqs
+        Endpoint: { "Fn::GetAtt": ["AppointmentsQueuePE", "Arn"] }
+        TopicArn: { "Ref": "AppointmentsTopic" }
+        FilterPolicy:
+          countryISO: ["PE"]
+        RawMessageDelivery: "true"
+
+    SnsSubscriptionCL:
+      Type: AWS::SNS::Subscription
+      Properties:
+        Protocol: sqs
+        Endpoint: { "Fn::GetAtt": ["AppointmentsQueueCL", "Arn"] }
+        TopicArn: { "Ref": "AppointmentsTopic" }
+        FilterPolicy:
+          countryISO: ["CL"]
+        RawMessageDelivery: "true"
+
+    SqsPolicy:
+      Type: AWS::SQS::QueuePolicy
+      Properties:
+        Queues:
+          - { "Ref": "AppointmentsQueuePE" }
+          - { "Ref": "AppointmentsQueueCL" }
+        PolicyDocument:
+          Statement:
+            - Effect: "Allow"
+              Principal:
+                Service: "sns.amazonaws.com"
+              Action: "sqs:SendMessage"
+              Resource: "*"
+              Condition:
+                ArnEquals:
+                  aws:SourceArn: { "Ref": "AppointmentsTopic" }
+    
+    AppointmentEventBus:
+      Type: AWS::Events::EventBus
+      Properties:
+        Name: appointment-event-bus-${self:provider.stage}
+        
+    AppointmentsCompletionQueue:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: appointments-completion-queue-${self:provider.stage}
+        
+    EventBusToSqsRule:
+      Type: AWS::Events::Rule
+      Properties:
+        EventBusName: { "Ref": "AppointmentEventBus" }
+        EventPattern:
+          source:
+            - "appointment.processor"
+        Targets:
+          - Arn: { "Fn::GetAtt": ["AppointmentsCompletionQueue", "Arn"] }
+            Id: "CompletionQueueTarget"
+            
+    EventBridgeToSqsPolicy:
+      Type: AWS::SQS::QueuePolicy
+      Properties:
+        Queues:
+          - Ref: AppointmentsCompletionQueue
+        PolicyDocument:
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service: events.amazonaws.com
+              Action: sqs:SendMessage
+              Resource: { "Fn::GetAtt": ["AppointmentsCompletionQueue", "Arn"] }
+
 // ===== Directory: services/appointment-api/src =====
 
 // createAppointment.ts
@@ -454,7 +891,155 @@ async function createAppointmentHandler(event: any) {
   };
 }
 
-export const handler = lambdaHandlerWrapper(createAppointmentHandler);
+export const handler = lambdaHandlerWrapper(createAppointmentHandler);// listAppointments.ts
+import { ListAppointmentsRequestSchema } from '@core/application/dtos/AppointmentDtos';
+import { lambdaHandlerWrapper } from '@infrastructure/common/LambdaHandlerWrapper';
+import { container } from '@infrastructure/di/container';
+import { ListAppointmentsUseCase } from '@core/application/use-cases/ListAppointments';
+
+/**
+ * @description Manejador de Lambda para listar citas por insuredId.
+ */
+async function listAppointmentsHandler(event: any) {
+  // Extraer parámetros de la ruta y validarlos
+  const { insuredId } = ListAppointmentsRequestSchema.parse(event.pathParameters);
+
+  // Resolver la dependencia del caso de uso
+  const useCase = container.resolve<ListAppointmentsUseCase>('listAppointmentsUseCase');
+  
+  // Ejecutar el caso de uso
+  const result = await useCase.execute(insuredId);
+
+  // Retornar la respuesta exitosa
+  return {
+    statusCode: 200,
+    body: result,
+  };
+}
+
+export const handler = lambdaHandlerWrapper(listAppointmentsHandler);// updateAppointmentStatus.ts
+import { UpdateAppointmentStatusEventSchema } from '@core/application/dtos/AppointmentDtos';
+import { UpdateAppointmentStatusUseCase } from '@core/application/use-cases/UpdateAppointmentStatus';
+import { container } from '@infrastructure/di/container';
+
+export const handler = async (event: any): Promise<void> => {
+  console.log('Received SQS event for status update:', JSON.stringify(event, null, 2));
+
+  const useCase = container.resolve<UpdateAppointmentStatusUseCase>('updateAppointmentStatusUseCase');
+
+  for (const record of event.Records) {
+    try {
+      const body = JSON.parse(record.body);
+      
+      // El cuerpo del mensaje de SQS contiene el evento completo de EventBridge.
+      // El payload que nos interesa está en la propiedad 'detail'.
+      const eventDetail = body.detail;
+
+      // 1. Validar el detalle del evento
+      const validatedEvent = UpdateAppointmentStatusEventSchema.parse(eventDetail);
+
+      // 2. Ejecutar el caso de uso con los datos validados
+      await useCase.execute({
+        appointmentId: validatedEvent.appointmentId,
+        insuredId: validatedEvent.insuredId,
+      });
+
+    } catch (error) {
+      console.error('Failed to process status update record:', record.body, error);
+      // Lanzar el error para que SQS pueda gestionar los reintentos
+      throw error;
+    }
+  }
+};
+
+// ===== Directory: services/appointment-processor =====
+
+// serverless.yml
+service: appointment-processor
+
+provider:
+  name: aws
+  runtime: nodejs20.x
+  region: us-east-1
+  stage: ${opt:stage, 'dev'}
+  environment:
+    EVENT_BUS_NAME: appointment-event-bus-${self:provider.stage}
+    # Estas variables deben ser configuradas de forma segura (ej. SSM Parameter Store o .env)
+    RDS_HOST: ${env:RDS_HOST}
+    RDS_USER: ${env:RDS_USER}
+    RDS_PASSWORD: ${env:RDS_PASSWORD}
+    RDS_DATABASE: ${env:RDS_DATABASE}
+
+plugins:
+  - serverless-esbuild
+
+package:
+  individually: true
+
+custom:
+  esbuild:
+    bundle: true
+    minify: false
+    sourcemap: true
+    packager: pnpm
+
+functions:
+  processPE:
+    handler: src/handlers/process.handler
+    events:
+      - sqs:
+          arn:
+            Fn::Join:
+              - ":"
+              - - "arn:aws:sqs"
+                - ${self:provider.region}
+                - { Ref: "AWS::AccountId" }
+                - "appointments-queue-pe-${self:provider.stage}"
+
+  processCL:
+    handler: src/handlers/process.handler
+    events:
+      - sqs:
+          arn:
+            Fn::Join:
+              - ":"
+              - - "arn:aws:sqs"
+                - ${self:provider.region}
+                - { Ref: "AWS::AccountId" }
+                - "appointments-queue-cl-${self:provider.stage}"
+
+# NOTA: En un proyecto real, se definirían aquí los permisos IAM explícitos
+# para que los lambdas puedan acceder a SQS, RDS (VPC) y EventBridge.
+
+// ===== Directory: services/appointment-processor/src/handlers =====
+
+// process.ts
+import { SnsAppointmentEventSchema } from '@core/application/dtos/AppointmentDtos';
+import { ProcessAppointmentUseCase } from '@core/application/use-cases/ProcessAppointment';
+import { container } from '@infrastructure/di/container';
+
+export const handler = async (event: any): Promise<void> => {
+  console.log('Received SQS event:', JSON.stringify(event, null, 2));
+
+  // Resolver el caso de uso desde el contenedor de DI centralizado
+  const useCase = container.resolve<ProcessAppointmentUseCase>('processAppointmentUseCase');
+
+  for (const record of event.Records) {
+    try {
+      const body = JSON.parse(record.body);
+      
+      // 1. Validar el payload del evento
+      const appointmentEvent = SnsAppointmentEventSchema.parse(body);
+
+      // 2. Ejecutar el caso de uso
+      await useCase.execute(appointmentEvent);
+
+    } catch (error) {
+      console.error('Failed to process record:', record.body, error);
+      throw error; 
+    }
+  }
+};
 
 // ===== Directory: . =====
 
