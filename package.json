@@ -8,9 +8,9 @@
     "build": "tsc --build",
     "test": "jest",
     "test:watch": "jest --watch",
-    "deploy:api": "cd services/appointment-api && pnpm sls deploy --verbose",
-    "deploy:processor": "cd services/appointment-processor && pnpm sls deploy --verbose",
-    "offline:api": "cd services/appointment-api && pnpm sls offline start",
+    "deploy:api": "cd services/appointment-api && sls deploy --verbose",
+    "deploy:processor": "cd services/appointment-processor && sls deploy --verbose",
+    "offline:api": "cd services/appointment-api && sls offline start",
     "lint": "eslint . --ext .ts"
   },
   "devDependencies": {
