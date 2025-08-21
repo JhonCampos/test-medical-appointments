@@ -1,0 +1,6 @@
+# pnpm-workspace.yaml
+packages:
+  # Todos los paquetes en la carpeta 'packages'
+  - 'packages/*'
+  # Todos los servicios en la carpeta 'services'
+  - 'services/*'

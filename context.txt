@@ -1,0 +1,481 @@
+// ===== Directory: . =====
+
+// .gitignore
+node_modules
+// jest.config.js
+module.exports = {
+  preset: 'ts-jest',
+  testEnvironment: 'node',
+  roots: ['<rootDir>/packages'],
+  moduleNameMapper: {
+    '^@core/(.*)$': '<rootDir>/packages/core/src/$1',
+    '^@infrastructure/(.*)$': '<rootDir>/packages/infrastructure/src/$1',
+  },
+};// package.json
+{
+  "name": "test-medical-appointments",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Backend for Medical Appointment Scheduling",
+  "scripts": {
+    "context": "node scripts/generate-context.js",
+    "build": "tsc --build",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "deploy:api": "cd services/appointment-api && pnpm sls deploy --verbose",
+    "offline:api": "cd services/appointment-api && pnpm sls offline start",
+    "lint": "eslint . --ext .ts"
+  },
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "@types/node": "^24.3.0",
+    "esbuild": "^0.25.9",
+    "eslint": "^9.33.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.4",
+    "jest": "^30.0.5",
+    "prettier": "^3.6.2",
+    "serverless": "^4.18.0",
+    "serverless-dynamodb-local": "^0.2.40",
+    "serverless-esbuild": "^1.55.1",
+    "serverless-offline": "^14.4.0",
+    "serverless-offline-sns": "^0.78.1",
+    "serverless-offline-sqs": "^8.0.0",
+    "ts-jest": "^29.4.1",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.2"
+  },
+  "pnpm": {
+    "approvedBuildScripts": [
+      "esbuild",
+      "serverless"
+    ]
+  }
+}
+
+// ===== Directory: packages/core =====
+
+// package.json
+{
+  "name": "@core",
+  "version": "1.0.0",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "dependencies": {
+    "zod": "^4.0.17"
+  }
+}
+
+// ===== Directory: packages/core/src/application/dtos =====
+
+// AppointmentDtos.ts
+import { z } from 'zod';
+import { AppointmentSchema } from '../../domain/entities/Appointment';
+
+export const CreateAppointmentSchema = z.object({
+  insuredId: z.string().regex(/^[0-9]{5}$/, "El insuredId debe ser de 5 dígitos numéricos."),
+  scheduleId: z.number().int().positive(),
+  countryISO: z.enum(['PE', 'CL']),
+});
+
+export type CreateAppointmentDto = z.infer<typeof CreateAppointmentSchema>;
+
+export const AppointmentResponseSchema = AppointmentSchema;
+export type AppointmentResponseDto = z.infer<typeof AppointmentResponseSchema>;
+
+export const SnsAppointmentEventSchema = z.object({
+  appointmentId: z.string().uuid(),
+  insuredId: z.string(),
+  scheduleId: z.number(),
+  countryISO: z.enum(['PE', 'CL']),
+  createdAt: z.string().datetime(),
+});
+export type SnsAppointmentEventDto = z.infer<typeof SnsAppointmentEventSchema>;
+
+// ===== Directory: packages/core/src/application/use-cases =====
+
+// CreateAppointment.ts
+import { AppointmentEntity } from '../../domain/entities/Appointment';
+import { IAppointmentRepository } from '../../domain/ports/repositories/IAppointmentRepository';
+import { IEventPublisher } from '../../domain/ports/IEventPublisher';
+import { CreateAppointmentDto, AppointmentResponseDto } from '../dtos/AppointmentDtos';
+
+export class CreateAppointmentUseCase {
+  constructor(
+    private readonly appointmentRepository: IAppointmentRepository,
+    private readonly eventPublisher: IEventPublisher,
+  ) {}
+
+  async execute(dto: CreateAppointmentDto): Promise<AppointmentResponseDto> {
+    const appointmentEntity = AppointmentEntity.create(dto);
+    const appointment = appointmentEntity.values;
+
+    await this.appointmentRepository.save(appointment);
+
+    await this.eventPublisher.publish('AppointmentRequested', {
+      appointmentId: appointment.appointmentId,
+      insuredId: appointment.insuredId,
+      scheduleId: appointment.scheduleId,
+      countryISO: appointment.countryISO,
+      createdAt: appointment.createdAt,
+    }, {
+      countryISO: {
+        DataType: 'String',
+        StringValue: appointment.countryISO,
+      }
+    });
+    
+    return appointment;
+  }
+}
+
+// ===== Directory: packages/core/src/common/errors =====
+
+// AppError.ts
+// (Reutilizar el código de AppError y sus subclases del proyecto anterior)
+export enum ErrorCode {
+	BadRequest = "BAD_REQUEST",
+	NotFound = "NOT_FOUND",
+	ServerError = "SERVER_ERROR",
+}
+
+export enum HttpStatusCode {
+	BAD_REQUEST = 400,
+	NOT_FOUND = 404,
+	INTERNAL_SERVER_ERROR = 500,
+}
+
+export class AppError extends Error {
+	constructor(
+		message: string,
+		public errorCode: ErrorCode,
+		public statusCode: HttpStatusCode,
+		public errors?: object[],
+	) {
+		super(message);
+	}
+}
+
+// ===== Directory: packages/core/src/domain/entities =====
+
+// Appointment.ts
+import { z } from 'zod';
+
+export const AppointmentSchema = z.object({
+  appointmentId: z.string().uuid(),
+  insuredId: z.string().length(5),
+  scheduleId: z.number().int().positive(),
+  countryISO: z.enum(['PE', 'CL']),
+  status: z.enum(['PENDING', 'COMPLETED', 'FAILED']),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+});
+
+export type Appointment = z.infer<typeof AppointmentSchema>;
+
+export class AppointmentEntity {
+  private props: Appointment;
+
+  constructor(props: Appointment) {
+    this.props = { ...props };
+  }
+
+  static create(props: Omit<Appointment, 'appointmentId' | 'status' | 'createdAt' | 'updatedAt'>): AppointmentEntity {
+    const now = new Date().toISOString();
+    return new AppointmentEntity({
+      ...props,
+      appointmentId: crypto.randomUUID(),
+      status: 'PENDING',
+      createdAt: now,
+      updatedAt: now,
+    });
+  }
+
+  get values(): Appointment {
+    return this.props;
+  }
+
+  complete(): void {
+    if (this.props.status !== 'PENDING') {
+      // Aquí podrías lanzar un DomainError si fuera necesario
+      return;
+    }
+    this.props.status = 'COMPLETED';
+    this.props.updatedAt = new Date().toISOString();
+  }
+}
+
+// ===== Directory: packages/core/src/domain/ports =====
+
+// IEventPublisher.ts
+export interface IEventPublisher {
+  publish(topic: string, event: Record<string, any>, attributes?: Record<string, any>): Promise<void>;
+}
+
+// ===== Directory: packages/core/src/domain/ports/repositories =====
+
+// IAppointmentRepository.ts
+import { Appointment } from "../../entities/Appointment";
+
+export interface IAppointmentRepository {
+  save(appointment: Appointment): Promise<void>;
+}
+
+// ===== Directory: packages/core =====
+
+// tsconfig.json
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "outDir": "./dist"
+  },
+  "include": ["src/**/*"]
+}
+
+// ===== Directory: packages/infrastructure =====
+
+// package.json
+{
+  "name": "@infrastructure",
+  "version": "1.0.0",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.583.0",
+    "@aws-sdk/client-eventbridge": "^3.583.0",
+    "@aws-sdk/client-sns": "^3.583.0",
+    "@aws-sdk/util-dynamodb": "^3.583.0",
+    "awilix": "^10.0.1",
+    "mysql2": "^3.9.7",
+    "zod": "^4.0.17"
+  },
+  "devDependencies": {
+    "@types/mysql2": "github:types/mysql2"
+  }
+}
+
+// ===== Directory: packages/infrastructure/src/common =====
+
+// LambdaHandlerWrapper.ts
+import { AppError } from '../../../core/src/common/AppError';
+import { ZodError } from 'zod';
+
+export const lambdaHandlerWrapper = (handler: Function) => async (event: any, context: any) => {
+  try {
+    console.log('Request Event:', JSON.stringify(event, null, 2));
+    const result = await handler(event, context);
+
+    return {
+      statusCode: result.statusCode || 200,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(result.body),
+    };
+  } catch (error: any) {
+    if (error instanceof ZodError) {
+      return {
+        statusCode: 400,
+        body: JSON.stringify({
+          code: 'VALIDATION_ERROR',
+          message: 'La solicitud contiene datos inválidos.',
+          errors: error.errors,
+        }),
+      };
+    }
+
+    if (error instanceof AppError) {
+      return {
+        statusCode: error.statusCode,
+        body: JSON.stringify({
+          code: error.errorCode,
+          message: error.message,
+          errors: error.errors || [],
+        }),
+      };
+    }
+    
+    console.error("UNEXPECTED_ERROR", error);
+    return {
+      statusCode: 500,
+      body: JSON.stringify({
+        code: 'SERVER_ERROR',
+        message: 'Ocurrió un error inesperado.',
+      }),
+    };
+  }
+};
+
+// ===== Directory: packages/infrastructure/src/di =====
+
+// container.ts
+
+
+// ===== Directory: packages/infrastructure/src/messaging =====
+
+// EventBridgePublisher.ts
+// SnsEventPublisher.ts
+
+
+// ===== Directory: packages/infrastructure/src/persistence/dynamodb =====
+
+// AppointmentRepository.ts
+import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
+import { DynamoDBDocumentClient, PutCommand } from '@aws-sdk/lib-dynamodb';
+import { IAppointmentRepository } from '@core/domain/repositories/IAppointmentRepository';
+import { Appointment } from '@core/domain/entities/Appointment';
+
+export class DynamoDbAppointmentRepository implements IAppointmentRepository {
+  private readonly docClient: DynamoDBDocumentClient;
+  private readonly tableName = process.env.DYNAMODB_TABLE_APPOINTMENTS!;
+
+  constructor() {
+    const client = new DynamoDBClient({
+      endpoint: process.env.IS_OFFLINE ? 'http://localhost:8000' : undefined,
+    });
+    this.docClient = DynamoDBDocumentClient.from(client);
+  }
+
+  async save(appointment: Appointment): Promise<void> {
+    const command = new PutCommand({
+      TableName: this.tableName,
+      Item: appointment,
+    });
+    await this.docClient.send(command);
+  }
+
+  // Implementar los otros métodos (update, findById, findByInsuredId)
+  async update(appointment: Appointment): Promise<void> { /* ... */ }
+  async findById(appointmentId: string): Promise<Appointment | null> { /* ... */ return null; }
+  async findByInsuredId(insuredId: string): Promise<Appointment[]> { /* ... */ return []; }
+}
+
+// ===== Directory: packages/infrastructure/src/persistence/rds =====
+
+// AppointmentRdsRepository.ts
+
+
+// ===== Directory: . =====
+
+// pnpm-workspace.yaml
+# pnpm-workspace.yaml
+packages:
+  # Todos los paquetes en la carpeta 'packages'
+  - 'packages/*'
+  # Todos los servicios en la carpeta 'services'
+  - 'services/*'// README.md
+# test-medical-appointments
+
+
+// ===== Directory: services/appointment-api =====
+
+// serverless.yml
+service: appointment-api
+
+provider:
+  name: aws
+  runtime: nodejs20.x
+  region: us-east-1
+  stage: ${opt:stage, 'dev'}
+  environment:
+    DYNAMODB_TABLE_APPOINTMENTS: ${self:custom.tableName}
+    SNS_TOPIC_APPOINTMENTS_ARN: { "Fn::GetAtt": ["AppointmentsTopic", "TopicArn"] }
+
+plugins:
+  - serverless-esbuild
+  - serverless-offline
+  - serverless-dynamodb-local
+
+package:
+  individually: true
+
+custom:
+  tableName: appointments-table-${self:provider.stage}
+  esbuild:
+    bundle: true
+    minify: false
+    sourcemap: true
+    packager: pnpm
+  dynamodb:
+    start:
+      port: 8000
+      inMemory: true
+      migrate: true
+
+functions:
+  createAppointment:
+    handler: src/handlers/createAppointment.handler
+    events:
+      - httpApi:
+          path: /appointments
+          method: post
+  
+  # Definir las otras funciones (list, updateStatus)
+
+resources:
+  Resources:
+    AppointmentsTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:custom.tableName}
+        AttributeDefinitions:
+          - AttributeName: insuredId
+            AttributeType: S
+          - AttributeName: appointmentId
+            AttributeType: S
+        KeySchema:
+          - AttributeName: insuredId
+            KeyType: HASH
+          - AttributeName: appointmentId
+            KeyType: RANGE
+        BillingMode: PAY_PER_REQUEST
+    
+    AppointmentsTopic:
+      Type: AWS::SNS::Topic
+      Properties:
+        TopicName: appointments-topic-${self:provider.stage}
+
+// ===== Directory: services/appointment-api/src =====
+
+// createAppointment.ts
+import { CreateAppointmentSchema } from '@core/application/dtos/AppointmentDtos';
+import { lambdaHandlerWrapper } from '@infrastructure/common/LambdaHandlerWrapper';
+// Lógica para inicializar el contenedor de DI (Awilix)
+import { container } from '@infrastructure/dependency-injection/container';
+
+async function createAppointmentHandler(event: any) {
+  const body = JSON.parse(event.body);
+  const dto = CreateAppointmentSchema.parse(body);
+
+  const useCase = container.resolve('createAppointmentUseCase');
+  const result = await useCase.execute(dto);
+
+  return {
+    statusCode: 202, // Accepted
+    body: result,
+  };
+}
+
+export const handler = lambdaHandlerWrapper(createAppointmentHandler);
+
+// ===== Directory: . =====
+
+// tsconfig.json
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "commonjs",
+    "lib": ["es2022"],
+    "declaration": true,
+    "strict": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "composite": true,
+    "baseUrl": ".",
+    "paths": {
+      "@core/*": ["packages/core/src/*"],
+      "@infrastructure/*": ["packages/infrastructure/src/*"]
+    }
+  }
+}
