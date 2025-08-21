@@ -1,16 +1,22 @@
+# "org" ensures this Service is used with the correct Serverless Framework Access Key.
+org: aivoxia
 service: appointment-api
 
 provider:
   name: aws
   runtime: nodejs20.x
-  region: us-east-1
+  region: ${opt:region, 'us-east-2'}
   stage: ${opt:stage, 'dev'}
+  # Añadimos tags que se aplicarán a todos los recursos de la stack
+  tags:
+    app-id: test-medical-appoinments
+    app-center-cost: test-medical-appoinments
+    app-env: test
   environment:
     DYNAMODB_TABLE_APPOINTMENTS: ${self:custom.tableName}
     SNS_TOPIC_APPOINTMENTS_ARN: { "Ref": "AppointmentsTopic" }
 
 plugins:
-  - serverless-esbuild
   - serverless-offline
   - serverless-dynamodb-local
 
@@ -19,11 +25,6 @@ package:
 
 custom:
   tableName: appointments-table-${self:provider.stage}
-  esbuild:
-    bundle: true
-    minify: false
-    sourcemap: true
-    packager: pnpm
   dynamodb:
     start:
       port: 8000

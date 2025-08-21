@@ -9,6 +9,7 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "deploy:api": "cd services/appointment-api && pnpm sls deploy --verbose",
+    "deploy:processor": "cd services/appointment-processor && pnpm sls deploy --verbose",
     "offline:api": "cd services/appointment-api && pnpm sls offline start",
     "lint": "eslint . --ext .ts"
   },
@@ -29,7 +30,8 @@
     "serverless-offline-sqs": "^8.0.0",
     "ts-jest": "^29.4.1",
     "ts-node": "^10.9.2",
-    "typescript": "^5.9.2"
+    "typescript": "^5.9.2",
+    "zod": "^4.0.17"
   },
   "pnpm": {
     "approvedBuildScripts": [

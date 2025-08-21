@@ -3,15 +3,21 @@ service: appointment-processor
 provider:
   name: aws
   runtime: nodejs20.x
-  region: us-east-1
+  region: ${opt:region, 'us-east-2'}
   stage: ${opt:stage, 'dev'}
+  profile: ${opt:profile, 'aivoxia'}
+  # Añadimos tags que se aplicarán a todos los recursos de la stack
+  tags:
+    app-id: test-medical-appoinments
+    app-center-cost: test-medical-appoinments
+    app-env: test
   environment:
     EVENT_BUS_NAME: appointment-event-bus-${self:provider.stage}
     # Estas variables deben ser configuradas de forma segura (ej. SSM Parameter Store o .env)
-    RDS_HOST: ${env:RDS_HOST}
-    RDS_USER: ${env:RDS_USER}
-    RDS_PASSWORD: ${env:RDS_PASSWORD}
-    RDS_DATABASE: ${env:RDS_DATABASE}
+    #RDS_HOST: ${env:RDS_HOST}
+    #RDS_USER: ${env:RDS_USER}
+    #RDS_PASSWORD: ${env:RDS_PASSWORD}
+    #RDS_DATABASE: ${env:RDS_DATABASE}
 
 plugins:
   - serverless-esbuild

@@ -6,7 +6,7 @@ node_modules
 module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'node',
-  roots: ['<rootDir>/packages'],
+  roots: ['<rootDir>/packages/test'],
   moduleNameMapper: {
     '^@core/(.*)$': '<rootDir>/packages/core/src/$1',
     '^@infrastructure/(.*)$': '<rootDir>/packages/infrastructure/src/$1',
@@ -23,6 +23,7 @@ module.exports = {
     "test": "jest",
     "test:watch": "jest --watch",
     "deploy:api": "cd services/appointment-api && pnpm sls deploy --verbose",
+    "deploy:processor": "cd services/appointment-processor && pnpm sls deploy --verbose",
     "offline:api": "cd services/appointment-api && pnpm sls offline start",
     "lint": "eslint . --ext .ts"
   },
@@ -43,7 +44,8 @@ module.exports = {
     "serverless-offline-sqs": "^8.0.0",
     "ts-jest": "^29.4.1",
     "ts-node": "^10.9.2",
-    "typescript": "^5.9.2"
+    "typescript": "^5.9.2",
+    "zod": "^4.0.17"
   },
   "pnpm": {
     "approvedBuildScripts": [
@@ -160,43 +162,76 @@ export class ListAppointmentsUseCase {
   async execute(insuredId: string): Promise<Appointment[]> {
     return this.appointmentRepository.findByInsuredId(insuredId);
   }
-}// ProcessAppointment.ts
+}// ProcessAppointmentCL.ts
 import { SnsAppointmentEventDto } from '../dtos/AppointmentDtos';
 import { IConfirmationPublisher } from '../../domain/ports/IConfirmationPublisher';
 import { Appointment } from '../../domain/entities/Appointment';
-
-// Creamos una interfaz simple para el repositorio de RDS en la capa de aplicación
-// para no depender directamente de la implementación de infra.
-export interface IAppointmentRdsRepository {
-  save(appointment: Appointment): Promise<void>;
-}
+import { IAppointmentCountryRepository } from '@core/domain/ports/repositories/IAppointmentCountryRepository';
 
 /**
- * @description Caso de uso para procesar una cita, guardarla en la base de datos
- * secundaria (RDS) y publicar un evento de confirmación.
+ * @description Caso de uso para procesar una cita de CHILE.
+ * Guarda en RDS y publica un evento de confirmación.
  */
-export class ProcessAppointmentUseCase {
+export class ProcessAppointmentCLUseCase {
   constructor(
-    private readonly rdsRepository: IAppointmentRdsRepository,
+    private readonly rdsRepository: IAppointmentCountryRepository,
     private readonly confirmationPublisher: IConfirmationPublisher
   ) {}
 
   /**
-   * Ejecuta el caso de uso.
+   * Ejecuta el caso de uso para Chile.
    * @param appointmentEvent El DTO del evento recibido de SNS.
    */
   async execute(appointmentEvent: SnsAppointmentEventDto): Promise<void> {
-    // 1. Reconstruir la entidad Appointment para la persistencia
     const appointmentToSave: Appointment = {
       ...appointmentEvent,
-      status: 'PENDING', // El estado inicial se guarda en RDS
+      status: 'PENDING',
+      updatedAt: new Date(appointmentEvent.createdAt).toISOString(),
+    };
+    
+    // Aquí iría la futura lógica de negocio específica para Chile.
+    console.log(`Executing Chile-specific appointment processing for ID: ${appointmentEvent.appointmentId}`);
+
+    await this.rdsRepository.save(appointmentToSave);
+
+    await this.confirmationPublisher.publish({
+      appointmentId: appointmentToSave.appointmentId,
+      insuredId: appointmentToSave.insuredId,
+      status: 'PROCESSED',
+    });
+  }
+}// ProcessAppointmentPE.ts
+import { SnsAppointmentEventDto } from '../dtos/AppointmentDtos';
+import { IConfirmationPublisher } from '../../domain/ports/IConfirmationPublisher';
+import { Appointment } from '../../domain/entities/Appointment';
+import { IAppointmentCountryRepository } from '@core/domain/ports/repositories/IAppointmentCountryRepository';
+
+/**
+ * @description Caso de uso para procesar una cita de PERÚ.
+ * Guarda en RDS y publica un evento de confirmación.
+ */
+export class ProcessAppointmentPEUseCase {
+  constructor(
+    private readonly rdsRepository: IAppointmentCountryRepository,
+    private readonly confirmationPublisher: IConfirmationPublisher
+  ) {}
+
+  /**
+   * Ejecuta el caso de uso para Perú.
+   * @param appointmentEvent El DTO del evento recibido de SNS.
+   */
+  async execute(appointmentEvent: SnsAppointmentEventDto): Promise<void> {
+    const appointmentToSave: Appointment = {
+      ...appointmentEvent,
+      status: 'PENDING',
       updatedAt: new Date(appointmentEvent.createdAt).toISOString(),
     };
 
-    // 2. Guardar en la base de datos RDS
+    // Aquí iría la futura lógica de negocio específica para Perú.
+    console.log(`Executing Peru-specific appointment processing for ID: ${appointmentEvent.appointmentId}`);
+
     await this.rdsRepository.save(appointmentToSave);
 
-    // 3. Publicar evento de confirmación
     await this.confirmationPublisher.publish({
       appointmentId: appointmentToSave.appointmentId,
       insuredId: appointmentToSave.insuredId,
@@ -281,6 +316,40 @@ export class AppError extends Error {
 	}
 }
 
+// ===== Directory: packages/core/src/common/utils =====
+
+// validation.ts
+import { z, ZodError } from 'zod';
+import { AppError, ErrorCode, HttpStatusCode } from '../errors/AppError';
+
+/**
+ * Valida y parsea un objeto de datos usando un esquema de Zod.
+ * Si la validación falla, lanza un AppError estandarizado con los detalles.
+ *
+ * @template T El tipo inferido del esquema.
+ * @param {z.ZodSchema<T>} schema El esquema de Zod para la validación.
+ * @param {unknown} data Los datos a validar.
+ * @returns {T} Los datos validados y tipados.
+ * @throws {AppError} Si la validación falla.
+ */
+export function validateAndParse<T>(schema: z.ZodSchema<T>, data: unknown): T {
+  try {
+    return schema.parse(data);
+  } catch (error) {
+    if (error instanceof ZodError) {
+      // Lanza nuestro error personalizado adjuntando los detalles de Zod.
+      throw new AppError(
+        'La solicitud contiene datos inválidos.',
+        ErrorCode.BadRequest,
+        HttpStatusCode.BAD_REQUEST,
+        error.issues, // Corregido: de 'errors' a 'issues'
+      );
+    }
+    // Si es otro tipo de error, lo relanzamos.
+    throw error;
+  }
+}
+
 // ===== Directory: packages/core/src/domain/entities =====
 
 // Appointment.ts
@@ -349,7 +418,11 @@ export interface IEventPublisher {
 
 // ===== Directory: packages/core/src/domain/ports/repositories =====
 
-// IAppointmentRepository.ts
+// IAppointmentCountryRepository.ts
+import { Appointment } from "../../entities/Appointment";
+export interface IAppointmentCountryRepository {
+  save(appointment: Appointment): Promise<void>;
+}// IAppointmentRepository.ts
 import { Appointment } from "../../entities/Appointment";
 
 export interface IAppointmentRepository {
@@ -382,6 +455,7 @@ export interface IAppointmentRepository {
     "@aws-sdk/client-dynamodb": "^3.583.0",
     "@aws-sdk/client-eventbridge": "^3.583.0",
     "@aws-sdk/client-sns": "^3.583.0",
+    "@aws-sdk/lib-dynamodb": "^3.873.0",
     "@aws-sdk/util-dynamodb": "^3.583.0",
     "awilix": "^10.0.1",
     "mysql2": "^3.9.7",
@@ -394,10 +468,77 @@ export interface IAppointmentRepository {
 
 // ===== Directory: packages/infrastructure/src/common =====
 
-// LambdaHandlerWrapper.ts
-import { AppError } from '../../../core/src/common/AppError';
-import { ZodError } from 'zod';
+// ErrorHandler.ts
+import { AppError, ErrorCode, HttpStatusCode } from '@core/common/errors/AppError';
 
+/**
+ * Genera un log de error estructurado en formato JSON.
+ * @param error El objeto de error capturado.
+ */
+function logError(error: Error | AppError): void {
+  const logPayload = {
+    level: "ERROR",
+    timestamp: new Date().toISOString(),
+    error: {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+      ...((error instanceof AppError) && { // Agrega contexto si es un AppError
+        code: error.errorCode,
+        statusCode: error.statusCode,
+        details: error.errors || [],
+      }),
+    }
+  };
+  console.error(JSON.stringify(logPayload, null, 2));
+}
+
+/**
+ * Maneja los errores capturados en el Lambda y los convierte en una respuesta HTTP estándar.
+ * También se encarga de registrar el error de forma estructurada.
+ *
+ * @param {unknown} error El error capturado.
+ * @returns El objeto de respuesta HTTP para API Gateway.
+ */
+export function handleError(error: unknown) {
+  if (error instanceof AppError) {
+    logError(error);
+    return {
+      statusCode: error.statusCode,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        code: error.errorCode,
+        message: error.message,
+        ...(error.errors && { errors: error.errors }),
+      }),
+    };
+  }
+
+  // Captura de errores inesperados
+  const unexpectedError = error instanceof Error
+    ? error
+    : new Error('An unexpected error occurred.');
+
+  logError(unexpectedError);
+
+  return {
+    statusCode: HttpStatusCode.INTERNAL_SERVER_ERROR,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      code: ErrorCode.ServerError,
+      message: 'Ocurrió un error inesperado.',
+    }),
+  };
+}// LambdaHandlerWrapper.ts
+import { handleError } from './ErrorHandler';
+
+/**
+ * Wrapper de alto nivel para los manejadores de Lambda.
+ * Se encarga de la ejecución, el manejo de respuestas exitosas y la delegación
+ * de errores al manejador centralizado.
+ *
+ * @param handler La función del manejador de Lambda a ejecutar.
+ */
 export const lambdaHandlerWrapper = (handler: Function) => async (event: any, context: any) => {
   try {
     console.log('Request Event:', JSON.stringify(event, null, 2));
@@ -408,37 +549,9 @@ export const lambdaHandlerWrapper = (handler: Function) => async (event: any, co
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(result.body),
     };
-  } catch (error: any) {
-    if (error instanceof ZodError) {
-      return {
-        statusCode: 400,
-        body: JSON.stringify({
-          code: 'VALIDATION_ERROR',
-          message: 'La solicitud contiene datos inválidos.',
-          errors: error.errors,
-        }),
-      };
-    }
-
-    if (error instanceof AppError) {
-      return {
-        statusCode: error.statusCode,
-        body: JSON.stringify({
-          code: error.errorCode,
-          message: error.message,
-          errors: error.errors || [],
-        }),
-      };
-    }
-    
-    console.error("UNEXPECTED_ERROR", error);
-    return {
-      statusCode: 500,
-      body: JSON.stringify({
-        code: 'SERVER_ERROR',
-        message: 'Ocurrió un error inesperado.',
-      }),
-    };
+  } catch (error: unknown) {
+    // Toda la lógica de manejo de errores se delega a nuestro nuevo manejador.
+    return handleError(error);
   }
 };
 
@@ -449,7 +562,9 @@ import { createContainer, asClass, InjectionMode } from 'awilix';
 import { CreateAppointmentUseCase } from '@core/application/use-cases/CreateAppointment';
 import { ListAppointmentsUseCase } from '@core/application/use-cases/ListAppointments';
 import { UpdateAppointmentStatusUseCase } from '@core/application/use-cases/UpdateAppointmentStatus';
-import { ProcessAppointmentUseCase } from '@core/application/use-cases/ProcessAppointment';
+// Importamos los nuevos casos de uso
+import { ProcessAppointmentPEUseCase } from '@core/application/use-cases/ProcessAppointmentPE';
+import { ProcessAppointmentCLUseCase } from '@core/application/use-cases/ProcessAppointmentCL';
 import { DynamoDbAppointmentRepository } from '../persistence/dynamodb/AppointmentRepository';
 import { SnsEventPublisher } from '../messaging/SnsEventPublisher';
 import { AppointmentRdsRepository } from '../persistence/rds/AppointmentRdsRepository';
@@ -459,7 +574,6 @@ const container = createContainer({
   injectionMode: InjectionMode.PROXY,
 });
 
-// Contenedor Centralizado para todos los servicios
 container.register({
   // Repositorios
   appointmentRepository: asClass(DynamoDbAppointmentRepository).singleton(),
@@ -473,7 +587,10 @@ container.register({
   createAppointmentUseCase: asClass(CreateAppointmentUseCase).singleton(),
   listAppointmentsUseCase: asClass(ListAppointmentsUseCase).singleton(),
   updateAppointmentStatusUseCase: asClass(UpdateAppointmentStatusUseCase).singleton(),
-  processAppointmentUseCase: asClass(ProcessAppointmentUseCase).singleton(),
+  
+  // Registramos los nuevos casos de uso específicos y eliminamos el genérico
+  processAppointmentPEUseCase: asClass(ProcessAppointmentPEUseCase).singleton(),
+  processAppointmentCLUseCase: asClass(ProcessAppointmentCLUseCase).singleton(),
 });
 
 export { container };
@@ -642,7 +759,7 @@ export class DynamoDbAppointmentRepository implements IAppointmentRepository {
 // AppointmentRdsRepository.ts
 import { createPool, Pool } from 'mysql2/promise';
 import { Appointment } from '@core/domain/entities/Appointment';
-import { IAppointmentRdsRepository } from '@core/application/use-cases/ProcessAppointment';
+import { IAppointmentCountryRepository } from '@core/domain/ports/repositories/IAppointmentCountryRepository';
 
 /**
  * @description Repositorio para manejar la persistencia de citas en una base de datos RDS (MySQL).
@@ -656,19 +773,10 @@ import { IAppointmentRdsRepository } from '@core/application/use-cases/ProcessAp
  * created_at TIMESTAMP NOT NULL
  * );
  */
-export class AppointmentRdsRepository implements IAppointmentRdsRepository {
-  private pool: Pool;
+export class AppointmentRdsRepository implements IAppointmentCountryRepository {
 
   constructor() {
-    this.pool = createPool({
-      host: process.env.RDS_HOST,
-      user: process.env.RDS_USER,
-      password: process.env.RDS_PASSWORD,
-      database: process.env.RDS_DATABASE,
-      waitForConnections: true,
-      connectionLimit: 10,
-      queueLimit: 0,
-    });
+    
   }
 
   /**
@@ -681,14 +789,8 @@ export class AppointmentRdsRepository implements IAppointmentRdsRepository {
       VALUES (?, ?, ?, ?, ?, ?)
     `;
     try {
-      await this.pool.execute(sql, [
-        appointment.appointmentId,
-        appointment.insuredId,
-        appointment.scheduleId,
-        appointment.countryISO,
-        appointment.status,
-        new Date(appointment.createdAt),
-      ]);
+     
+      console.log(`Appointment SQL: ${sql}`);
       console.log(`Appointment ${appointment.appointmentId} saved to RDS.`);
     } catch (error) {
       console.error('Error saving appointment to RDS:', error);
@@ -696,6 +798,378 @@ export class AppointmentRdsRepository implements IAppointmentRdsRepository {
     }
   }
 }
+
+// ===== Directory: packages/test/core/application/use-cases =====
+
+// CreateAppointment.test.ts
+import { CreateAppointmentUseCase } from '@core/application/use-cases/CreateAppointment';
+import { IAppointmentRepository } from '@core/domain/ports/repositories/IAppointmentRepository';
+import { IEventPublisher } from '@core/domain/ports/IEventPublisher';
+import { CreateAppointmentDto } from '@core/application/dtos/AppointmentDtos';
+
+// Mockear crypto.randomUUID para tener un ID predecible en las pruebas
+const MOCK_APPOINTMENT_ID = 'e7a4b0c4-9a2d-4f1e-8c6c-5e4a3b2a1f0e';
+global.crypto = {
+  ...global.crypto,
+  randomUUID: () => MOCK_APPOINTMENT_ID,
+};
+
+describe('CreateAppointmentUseCase', () => {
+  let appointmentRepository: jest.Mocked<IAppointmentRepository>;
+  let eventPublisher: jest.Mocked<IEventPublisher>;
+  let createAppointmentUseCase: CreateAppointmentUseCase;
+
+  beforeEach(() => {
+    appointmentRepository = {
+      save: jest.fn(),
+      findById: jest.fn(),
+      update: jest.fn(),
+      findByInsuredId: jest.fn(),
+    };
+
+    eventPublisher = {
+      publish: jest.fn(),
+    };
+
+    createAppointmentUseCase = new CreateAppointmentUseCase(
+      appointmentRepository,
+      eventPublisher,
+    );
+  });
+
+  it('debe crear una cita, guardarla en el repositorio y publicar un evento', async () => {
+    // Arrange
+    const dto: CreateAppointmentDto = {
+      insuredId: '54321',
+      scheduleId: 200,
+      countryISO: 'CL',
+    };
+
+    // Act
+    const result = await createAppointmentUseCase.execute(dto);
+
+    // Assert
+    expect(appointmentRepository.save).toHaveBeenCalledTimes(1);
+    const savedAppointment = appointmentRepository.save.mock.calls[0][0];
+    expect(savedAppointment).toMatchObject({
+      appointmentId: MOCK_APPOINTMENT_ID,
+      insuredId: '54321',
+      scheduleId: 200,
+      countryISO: 'CL',
+      status: 'PENDING',
+      createdAt: expect.any(String),
+      updatedAt: expect.any(String),
+    });
+
+    expect(eventPublisher.publish).toHaveBeenCalledTimes(1);
+    const [topic, eventPayload, attributes] = eventPublisher.publish.mock.calls[0];
+    expect(topic).toBe('AppointmentRequested');
+    expect(eventPayload).toMatchObject({
+      appointmentId: MOCK_APPOINTMENT_ID,
+      insuredId: '54321',
+      scheduleId: 200,
+      countryISO: 'CL',
+      createdAt: savedAppointment.createdAt,
+    });
+    expect(attributes).toEqual({
+      countryISO: {
+        DataType: 'String',
+        StringValue: 'CL',
+      },
+    });
+
+    expect(result).toEqual(savedAppointment);
+  });
+});// ListAppointments.test.ts
+import { ListAppointmentsUseCase } from '@core/application/use-cases/ListAppointments';
+import { IAppointmentRepository } from '@core/domain/ports/repositories/IAppointmentRepository';
+import { Appointment } from '@core/domain/entities/Appointment';
+
+describe('ListAppointmentsUseCase', () => {
+  let appointmentRepository: jest.Mocked<IAppointmentRepository>;
+  let listAppointmentsUseCase: ListAppointmentsUseCase;
+
+  beforeEach(() => {
+    appointmentRepository = {
+      save: jest.fn(),
+      findById: jest.fn(),
+      update: jest.fn(),
+      findByInsuredId: jest.fn(),
+    };
+    listAppointmentsUseCase = new ListAppointmentsUseCase(appointmentRepository);
+  });
+
+  it('debe devolver una lista de citas para un asegurado existente', async () => {
+    // Arrange
+    const insuredId = '11223';
+    const mockAppointments: Appointment[] = [
+      {
+        appointmentId: 'uuid-1',
+        insuredId,
+        scheduleId: 1,
+        countryISO: 'PE',
+        status: 'PENDING',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      {
+        appointmentId: 'uuid-2',
+        insuredId,
+        scheduleId: 2,
+        countryISO: 'PE',
+        status: 'COMPLETED',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+    ];
+    appointmentRepository.findByInsuredId.mockResolvedValue(mockAppointments);
+
+    // Act
+    const result = await listAppointmentsUseCase.execute(insuredId);
+
+    // Assert
+    expect(appointmentRepository.findByInsuredId).toHaveBeenCalledWith(insuredId);
+    expect(result).toHaveLength(2);
+    expect(result).toEqual(mockAppointments);
+  });
+
+  it('debe devolver un arreglo vacío si el asegurado no tiene citas', async () => {
+    // Arrange
+    const insuredId = '33445';
+    appointmentRepository.findByInsuredId.mockResolvedValue([]);
+
+    // Act
+    const result = await listAppointmentsUseCase.execute(insuredId);
+
+    // Assert
+    expect(appointmentRepository.findByInsuredId).toHaveBeenCalledWith(insuredId);
+    expect(result).toHaveLength(0);
+    expect(result).toEqual([]);
+  });
+});// ProcessAppointmentCL.test.ts
+import { ProcessAppointmentCLUseCase } from '@core/application/use-cases/ProcessAppointmentCL';
+import { IAppointmentCountryRepository } from '@core/domain/ports/repositories/IAppointmentCountryRepository';
+import { IConfirmationPublisher } from '@core/domain/ports/IConfirmationPublisher';
+import { SnsAppointmentEventDto } from '@core/application/dtos/AppointmentDtos';
+
+describe('ProcessAppointmentCLUseCase', () => {
+  let rdsRepository: jest.Mocked<IAppointmentCountryRepository>;
+  let confirmationPublisher: jest.Mocked<IConfirmationPublisher>;
+  let useCase: ProcessAppointmentCLUseCase;
+
+  beforeEach(() => {
+    rdsRepository = { save: jest.fn() };
+    confirmationPublisher = { publish: jest.fn() };
+    useCase = new ProcessAppointmentCLUseCase(rdsRepository, confirmationPublisher);
+  });
+
+  it('debe guardar la cita en RDS y publicar un evento de confirmación', async () => {
+    // Arrange
+    const eventDto: SnsAppointmentEventDto = {
+      appointmentId: 'uuid-cl-1',
+      insuredId: '55555',
+      scheduleId: 400,
+      countryISO: 'CL',
+      createdAt: new Date().toISOString(),
+    };
+
+    // Act
+    await useCase.execute(eventDto);
+
+    // Assert
+    expect(rdsRepository.save).toHaveBeenCalledTimes(1);
+    const savedAppointment = rdsRepository.save.mock.calls[0][0];
+    expect(savedAppointment).toMatchObject({
+      ...eventDto,
+      status: 'PENDING',
+      updatedAt: eventDto.createdAt,
+    });
+
+    expect(confirmationPublisher.publish).toHaveBeenCalledTimes(1);
+    const publishedEvent = confirmationPublisher.publish.mock.calls[0][0];
+    expect(publishedEvent).toEqual({
+      appointmentId: eventDto.appointmentId,
+      insuredId: eventDto.insuredId,
+      status: 'PROCESSED',
+    });
+  });
+});// ProcessAppointmentPE.test.ts
+import { ProcessAppointmentPEUseCase } from '@core/application/use-cases/ProcessAppointmentPE';
+import { IAppointmentCountryRepository } from '@core/domain/ports/repositories/IAppointmentCountryRepository';
+import { IConfirmationPublisher } from '@core/domain/ports/IConfirmationPublisher';
+import { SnsAppointmentEventDto } from '@core/application/dtos/AppointmentDtos';
+
+describe('ProcessAppointmentPEUseCase', () => {
+  let rdsRepository: jest.Mocked<IAppointmentCountryRepository>;
+  let confirmationPublisher: jest.Mocked<IConfirmationPublisher>;
+  let useCase: ProcessAppointmentPEUseCase;
+
+  beforeEach(() => {
+    rdsRepository = { save: jest.fn() };
+    confirmationPublisher = { publish: jest.fn() };
+    useCase = new ProcessAppointmentPEUseCase(rdsRepository, confirmationPublisher);
+  });
+
+  it('debe guardar la cita en RDS y publicar un evento de confirmación', async () => {
+    // Arrange
+    const eventDto: SnsAppointmentEventDto = {
+      appointmentId: 'uuid-pe-1',
+      insuredId: '98765',
+      scheduleId: 300,
+      countryISO: 'PE',
+      createdAt: new Date().toISOString(),
+    };
+
+    // Act
+    await useCase.execute(eventDto);
+
+    // Assert
+    expect(rdsRepository.save).toHaveBeenCalledTimes(1);
+    const savedAppointment = rdsRepository.save.mock.calls[0][0];
+    expect(savedAppointment).toMatchObject({
+      ...eventDto,
+      status: 'PENDING',
+      updatedAt: eventDto.createdAt,
+    });
+
+    expect(confirmationPublisher.publish).toHaveBeenCalledTimes(1);
+    const publishedEvent = confirmationPublisher.publish.mock.calls[0][0];
+    expect(publishedEvent).toEqual({
+      appointmentId: eventDto.appointmentId,
+      insuredId: eventDto.insuredId,
+      status: 'PROCESSED',
+    });
+  });
+});// UpdateAppointmentStatus.test.ts
+import { UpdateAppointmentStatusUseCase } from '@core/application/use-cases/UpdateAppointmentStatus';
+import { IAppointmentRepository } from '@core/domain/ports/repositories/IAppointmentRepository';
+import { Appointment } from '@core/domain/entities/Appointment';
+import { AppError, ErrorCode } from '@core/common/errors/AppError';
+
+describe('UpdateAppointmentStatusUseCase', () => {
+  let appointmentRepository: jest.Mocked<IAppointmentRepository>;
+  let useCase: UpdateAppointmentStatusUseCase;
+
+  beforeEach(() => {
+    appointmentRepository = {
+      save: jest.fn(),
+      findById: jest.fn(),
+      update: jest.fn(),
+      findByInsuredId: jest.fn(),
+    };
+    useCase = new UpdateAppointmentStatusUseCase(appointmentRepository);
+  });
+
+  it('debe actualizar el estado de una cita a COMPLETED', async () => {
+    // Arrange
+    const dto = { appointmentId: 'uuid-1', insuredId: '12345' };
+    const existingAppointment: Appointment = {
+      ...dto,
+      scheduleId: 1,
+      countryISO: 'PE',
+      status: 'PENDING',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    appointmentRepository.findById.mockResolvedValue(existingAppointment);
+
+    // Act
+    await useCase.execute(dto);
+
+    // Assert
+    expect(appointmentRepository.findById).toHaveBeenCalledWith(dto);
+    expect(appointmentRepository.update).toHaveBeenCalledTimes(1);
+    const updatedAppointment = appointmentRepository.update.mock.calls[0][0];
+    expect(updatedAppointment.status).toBe('COMPLETED');
+    expect(new Date(updatedAppointment.updatedAt).getTime()).toBeGreaterThan(new Date(existingAppointment.updatedAt).getTime());
+  });
+
+  it('debe lanzar un AppError si la cita no se encuentra', async () => {
+    // Arrange
+    const dto = { appointmentId: 'uuid-not-found', insuredId: '12345' };
+    appointmentRepository.findById.mockResolvedValue(null);
+
+    // Act & Assert
+    await expect(useCase.execute(dto)).rejects.toThrow(
+      new AppError(
+        `Appointment with ID ${dto.appointmentId} not found.`,
+        ErrorCode.NotFound,
+        404
+      )
+    );
+  });
+});
+
+// ===== Directory: packages/test/core/common/utils =====
+
+// validation.test.ts
+import { z, ZodError } from 'zod';
+import { validateAndParse } from '@core/common/utils/validation';
+import { AppError, ErrorCode, HttpStatusCode } from '@core/common/errors/AppError';
+
+// 1. Definimos un esquema simple para usar en las pruebas
+const testSchema = z.object({
+  name: z.string().min(3),
+  age: z.number().positive(),
+});
+
+describe('validateAndParse', () => {
+
+  // Test Case 1: El camino feliz, cuando los datos son válidos
+  it('debe devolver los datos parseados cuando la validación es exitosa', () => {
+    // Arrange
+    const validData = { name: 'John Doe', age: 30 };
+
+    // Act
+    const result = validateAndParse(testSchema, validData);
+
+    // Assert
+    expect(result).toEqual(validData);
+  });
+
+  // Test Case 2: Cuando los datos no cumplen con el esquema de Zod
+  it('debe lanzar un AppError estandarizado cuando la validación de Zod falla', () => {
+    // Arrange
+    const invalidData = { name: 'Jo', age: -5 }; // Nombre muy corto y edad negativa
+
+    // Act & Assert
+    try {
+      validateAndParse(testSchema, invalidData);
+      // Si llegamos aquí, la prueba falló porque no se lanzó un error
+      fail('La función no lanzó ningún error');
+    } catch (error) {
+      expect(error).toBeInstanceOf(AppError);
+      
+      const appError = error as AppError;
+      expect(appError.message).toBe('La solicitud contiene datos inválidos.');
+      expect(appError.errorCode).toBe(ErrorCode.BadRequest);
+      expect(appError.statusCode).toBe(HttpStatusCode.BAD_REQUEST);
+      
+      // Verificamos que los detalles del error de Zod se adjuntaron
+      expect(appError.errors).toBeDefined();
+      expect(Array.isArray(appError.errors)).toBe(true);
+      expect(appError.errors?.length).toBe(2); // Esperamos dos errores de validación
+    }
+  });
+
+  // Test Case 3: Cuando ocurre un error que no es de Zod
+  it('debe relanzar el error si no es una instancia de ZodError', () => {
+    // Arrange
+    const unexpectedError = new Error('Error inesperado en la base de datos');
+    
+    // Creamos un esquema simulado que siempre lanza un error genérico
+    const mockSchemaWithError = {
+      parse: () => {
+        throw unexpectedError;
+      },
+    } as any;
+
+    // Act & Assert
+    expect(() => {
+      validateAndParse(mockSchemaWithError, {});
+    }).toThrow(unexpectedError);
+  });
+});
 
 // ===== Directory: . =====
 
@@ -717,8 +1191,13 @@ service: appointment-api
 provider:
   name: aws
   runtime: nodejs20.x
-  region: us-east-1
+  region: ${opt:region, 'us-east-2'}
   stage: ${opt:stage, 'dev'}
+  # Añadimos tags que se aplicarán a todos los recursos de la stack
+  tags:
+    app-id: test-medical-appoinments
+    app-center-cost: test-medical-appoinments
+    app-env: test
   environment:
     DYNAMODB_TABLE_APPOINTMENTS: ${self:custom.tableName}
     SNS_TOPIC_APPOINTMENTS_ARN: { "Ref": "AppointmentsTopic" }
@@ -875,14 +1354,18 @@ resources:
 // createAppointment.ts
 import { CreateAppointmentSchema } from '@core/application/dtos/AppointmentDtos';
 import { lambdaHandlerWrapper } from '@infrastructure/common/LambdaHandlerWrapper';
-// Lógica para inicializar el contenedor de DI (Awilix)
-import { container } from '@infrastructure/dependency-injection/container';
+import { container } from '@infrastructure/di/container';
+import { CreateAppointmentUseCase } from '@core/application/use-cases/CreateAppointment';
+import { validateAndParse } from '@core/common/utils/validation';
 
 async function createAppointmentHandler(event: any) {
   const body = JSON.parse(event.body);
-  const dto = CreateAppointmentSchema.parse(body);
+  
+  // Usamos el nuevo wrapper de validación.
+  // Si la validación falla, lanzará un AppError que será capturado por el lambdaHandlerWrapper.
+  const dto = validateAndParse(CreateAppointmentSchema, body);
 
-  const useCase = container.resolve('createAppointmentUseCase');
+  const useCase = container.resolve<CreateAppointmentUseCase>('createAppointmentUseCase');
   const result = await useCase.execute(dto);
 
   return {
@@ -960,15 +1443,20 @@ service: appointment-processor
 provider:
   name: aws
   runtime: nodejs20.x
-  region: us-east-1
+  region: ${opt:region, 'us-east-2'}
   stage: ${opt:stage, 'dev'}
+  # Añadimos tags que se aplicarán a todos los recursos de la stack
+  tags:
+    app-id: test-medical-appoinments
+    app-center-cost: test-medical-appoinments
+    app-env: test
   environment:
     EVENT_BUS_NAME: appointment-event-bus-${self:provider.stage}
     # Estas variables deben ser configuradas de forma segura (ej. SSM Parameter Store o .env)
-    RDS_HOST: ${env:RDS_HOST}
-    RDS_USER: ${env:RDS_USER}
-    RDS_PASSWORD: ${env:RDS_PASSWORD}
-    RDS_DATABASE: ${env:RDS_DATABASE}
+    #RDS_HOST: ${env:RDS_HOST}
+    #RDS_USER: ${env:RDS_USER}
+    #RDS_PASSWORD: ${env:RDS_PASSWORD}
+    #RDS_DATABASE: ${env:RDS_DATABASE}
 
 plugins:
   - serverless-esbuild
@@ -985,7 +1473,8 @@ custom:
 
 functions:
   processPE:
-    handler: src/handlers/process.handler
+    # Apuntamos al nuevo handler para Perú
+    handler: src/handlers/processPE.handler
     events:
       - sqs:
           arn:
@@ -997,7 +1486,8 @@ functions:
                 - "appointments-queue-pe-${self:provider.stage}"
 
   processCL:
-    handler: src/handlers/process.handler
+    # Apuntamos al nuevo handler para Chile
+    handler: src/handlers/processCL.handler
     events:
       - sqs:
           arn:
@@ -1013,30 +1503,44 @@ functions:
 
 // ===== Directory: services/appointment-processor/src/handlers =====
 
-// process.ts
+// processCL.ts
 import { SnsAppointmentEventSchema } from '@core/application/dtos/AppointmentDtos';
-import { ProcessAppointmentUseCase } from '@core/application/use-cases/ProcessAppointment';
+import { ProcessAppointmentCLUseCase } from '@core/application/use-cases/ProcessAppointmentCL';
 import { container } from '@infrastructure/di/container';
+import { validateAndParse } from '@core/common/utils/validation';
 
 export const handler = async (event: any): Promise<void> => {
-  console.log('Received SQS event:', JSON.stringify(event, null, 2));
-
-  // Resolver el caso de uso desde el contenedor de DI centralizado
-  const useCase = container.resolve<ProcessAppointmentUseCase>('processAppointmentUseCase');
+  console.log('Received SQS event for CL:', JSON.stringify(event, null, 2));
+  const useCase = container.resolve<ProcessAppointmentCLUseCase>('processAppointmentCLUseCase');
 
   for (const record of event.Records) {
     try {
       const body = JSON.parse(record.body);
-      
-      // 1. Validar el payload del evento
-      const appointmentEvent = SnsAppointmentEventSchema.parse(body);
-
-      // 2. Ejecutar el caso de uso
+      const appointmentEvent = validateAndParse(SnsAppointmentEventSchema, body);
       await useCase.execute(appointmentEvent);
-
     } catch (error) {
-      console.error('Failed to process record:', record.body, error);
-      throw error; 
+      console.error('Failed to process CL record:', record.body, error);
+      throw error;
+    }
+  }
+};// processPE.ts
+import { SnsAppointmentEventSchema } from '@core/application/dtos/AppointmentDtos';
+import { ProcessAppointmentPEUseCase } from '@core/application/use-cases/ProcessAppointmentPE';
+import { container } from '@infrastructure/di/container';
+import { validateAndParse } from '@core/common/utils/validation';
+
+export const handler = async (event: any): Promise<void> => {
+  console.log('Received SQS event for PE:', JSON.stringify(event, null, 2));
+  const useCase = container.resolve<ProcessAppointmentPEUseCase>('processAppointmentPEUseCase');
+
+  for (const record of event.Records) {
+    try {
+      const body = JSON.parse(record.body);
+      const appointmentEvent = validateAndParse(SnsAppointmentEventSchema, body);
+      await useCase.execute(appointmentEvent);
+    } catch (error) {
+      console.error('Failed to process PE record:', record.body, error);
+      throw error;
     }
   }
 };
