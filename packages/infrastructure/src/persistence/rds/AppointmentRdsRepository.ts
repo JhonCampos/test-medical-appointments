@@ -1,6 +1,6 @@
 import { createPool, Pool } from 'mysql2/promise';
 import { Appointment } from '@core/domain/entities/Appointment';
-import { IAppointmentRdsRepository } from '@core/application/use-cases/ProcessAppointment';
+import { IAppointmentCountryRepository } from '@core/domain/ports/repositories/IAppointmentCountryRepository';
 
 /**
  * @description Repositorio para manejar la persistencia de citas en una base de datos RDS (MySQL).
@@ -14,19 +14,10 @@ import { IAppointmentRdsRepository } from '@core/application/use-cases/ProcessAp
  * created_at TIMESTAMP NOT NULL
  * );
  */
-export class AppointmentRdsRepository implements IAppointmentRdsRepository {
-  private pool: Pool;
+export class AppointmentRdsRepository implements IAppointmentCountryRepository {
 
   constructor() {
-    this.pool = createPool({
-      host: process.env.RDS_HOST,
-      user: process.env.RDS_USER,
-      password: process.env.RDS_PASSWORD,
-      database: process.env.RDS_DATABASE,
-      waitForConnections: true,
-      connectionLimit: 10,
-      queueLimit: 0,
-    });
+    
   }
 
   /**
@@ -39,14 +30,8 @@ export class AppointmentRdsRepository implements IAppointmentRdsRepository {
       VALUES (?, ?, ?, ?, ?, ?)
     `;
     try {
-      await this.pool.execute(sql, [
-        appointment.appointmentId,
-        appointment.insuredId,
-        appointment.scheduleId,
-        appointment.countryISO,
-        appointment.status,
-        new Date(appointment.createdAt),
-      ]);
+     
+      console.log(`Appointment SQL: ${sql}`);
       console.log(`Appointment ${appointment.appointmentId} saved to RDS.`);
     } catch (error) {
       console.error('Error saving appointment to RDS:', error);
