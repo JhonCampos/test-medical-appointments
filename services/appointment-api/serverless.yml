@@ -16,6 +16,25 @@ provider:
     DYNAMODB_TABLE_APPOINTMENTS: ${self:custom.tableName}
     SNS_TOPIC_APPOINTMENTS_ARN: { "Ref": "AppointmentsTopic" }
 
+  iam:
+    role:
+      statements:
+        # Permisos
+        - Effect: "Allow"
+          Action:
+            - dynamodb:PutItem
+            - dynamodb:GetItem
+            - dynamodb:UpdateItem
+            - dynamodb:Query
+          Resource:
+            - Fn::GetAtt: [AppointmentsTable, Arn]
+            
+        - Effect: "Allow"
+          Action:
+            - sns:Publish
+          Resource:
+            - Ref: AppointmentsTopic
+
 plugins:
   - serverless-offline
   - serverless-dynamodb-local

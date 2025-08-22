@@ -22,6 +22,40 @@
             "Ref": "AppointmentsTopic"
           }
         },
+        "iam": {
+          "role": {
+            "statements": [
+              {
+                "Effect": "Allow",
+                "Action": [
+                  "dynamodb:PutItem",
+                  "dynamodb:GetItem",
+                  "dynamodb:UpdateItem",
+                  "dynamodb:Query"
+                ],
+                "Resource": [
+                  {
+                    "Fn::GetAtt": [
+                      "AppointmentsTable",
+                      "Arn"
+                    ]
+                  }
+                ]
+              },
+              {
+                "Effect": "Allow",
+                "Action": [
+                  "sns:Publish"
+                ],
+                "Resource": [
+                  {
+                    "Ref": "AppointmentsTopic"
+                  }
+                ]
+              }
+            ]
+          }
+        },
         "versionFunctions": true,
         "compiledCloudFormationTemplate": {
           "AWSTemplateFormatVersion": "2010-09-09",
@@ -106,6 +140,34 @@
                         {
                           "Effect": "Allow",
                           "Action": [
+                            "dynamodb:PutItem",
+                            "dynamodb:GetItem",
+                            "dynamodb:UpdateItem",
+                            "dynamodb:Query"
+                          ],
+                          "Resource": [
+                            {
+                              "Fn::GetAtt": [
+                                "AppointmentsTable",
+                                "Arn"
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "Effect": "Allow",
+                          "Action": [
+                            "sns:Publish"
+                          ],
+                          "Resource": [
+                            {
+                              "Ref": "AppointmentsTopic"
+                            }
+                          ]
+                        },
+                        {
+                          "Effect": "Allow",
+                          "Action": [
                             "sqs:ReceiveMessage",
                             "sqs:DeleteMessage",
                             "sqs:GetQueueAttributes"
@@ -144,7 +206,7 @@
               "Properties": {
                 "Code": {
                   "S3Bucket": "serverless-framework-deployments-us-east-2-91b3aea6-42e2",
-                  "S3Key": "serverless/appointment-api/dev/1755825371809-2025-08-22T01:16:11.809Z/appointment-api-appointmentHandler.zip"
+                  "S3Key": "serverless/appointment-api/dev/1755833396181-2025-08-22T03:29:56.181Z/appointment-api-appointmentHandler.zip"
                 },
                 "Handler": "src/handlers/appointment.handler",
                 "Runtime": "nodejs20.x",
@@ -190,7 +252,7 @@
               "Properties": {
                 "Code": {
                   "S3Bucket": "serverless-framework-deployments-us-east-2-91b3aea6-42e2",
-                  "S3Key": "serverless/appointment-api/dev/1755825371809-2025-08-22T01:16:11.809Z/appointment-api-swagger.zip"
+                  "S3Key": "serverless/appointment-api/dev/1755833396181-2025-08-22T03:29:56.181Z/appointment-api-swagger.zip"
                 },
                 "Handler": "src/handlers/swagger.ui",
                 "Runtime": "nodejs20.x",
@@ -236,7 +298,7 @@
               "Properties": {
                 "Code": {
                   "S3Bucket": "serverless-framework-deployments-us-east-2-91b3aea6-42e2",
-                  "S3Key": "serverless/appointment-api/dev/1755825371809-2025-08-22T01:16:11.809Z/appointment-api-swaggerSpec.zip"
+                  "S3Key": "serverless/appointment-api/dev/1755833396181-2025-08-22T03:29:56.181Z/appointment-api-swaggerSpec.zip"
                 },
                 "Handler": "src/handlers/swagger.spec",
                 "Runtime": "nodejs20.x",
@@ -277,34 +339,34 @@
                 "SwaggerSpecLogGroup"
               ]
             },
-            "SwaggerSpecLambdaVersionnZpb9gvJTpjYZtTjxMaB5Gb75B4SXmwUy0wbY6KY": {
-              "Type": "AWS::Lambda::Version",
-              "DeletionPolicy": "Retain",
-              "Properties": {
-                "FunctionName": {
-                  "Ref": "SwaggerSpecLambdaFunction"
-                },
-                "CodeSha256": "jkyY3AigTO3xOCWc9o6Dqz2qm50V8GoMfAxtsswHYKk="
-              }
-            },
-            "SwaggerLambdaVersion7rASq7wp8Nonmk8pfP1OIP3Kg8Xj13abTm2NaXXIY": {
+            "SwaggerLambdaVersion9uJrVSm6VQ14MyklLCHyvbYkhCJXUqpqLTr5WQsGDg": {
               "Type": "AWS::Lambda::Version",
               "DeletionPolicy": "Retain",
               "Properties": {
                 "FunctionName": {
                   "Ref": "SwaggerLambdaFunction"
                 },
-                "CodeSha256": "jkyY3AigTO3xOCWc9o6Dqz2qm50V8GoMfAxtsswHYKk="
+                "CodeSha256": "Lm2EtB4KlxNB6JAM/9RJh4Ugt21xp2oLH1ZJIuMyj5o="
               }
             },
-            "AppointmentHandlerLambdaVersionJZhFkguvEcSoDZKsLFNIoNXqPHYuqTgGA4qFK0Zt2Fc": {
+            "SwaggerSpecLambdaVersion7CynI7ivNMPA8lqhuT5G2JuS8OZxwAqhm1qTaDppE": {
+              "Type": "AWS::Lambda::Version",
+              "DeletionPolicy": "Retain",
+              "Properties": {
+                "FunctionName": {
+                  "Ref": "SwaggerSpecLambdaFunction"
+                },
+                "CodeSha256": "8pn7BydYs52NrVLWcs7LagwdjDYpoRedAE6yQwGmkcg="
+              }
+            },
+            "AppointmentHandlerLambdaVersionD7tFape2HTrR75GLIRHCCfgh85VceW1mZ9bnYFsI": {
               "Type": "AWS::Lambda::Version",
               "DeletionPolicy": "Retain",
               "Properties": {
                 "FunctionName": {
                   "Ref": "AppointmentHandlerLambdaFunction"
                 },
-                "CodeSha256": "z6lpowJ3q1kmR+QwFmqN3HgTDlq6zxQBdBpFxP/bQ4E="
+                "CodeSha256": "X15C/ZvcmDcIy773iHiwE3A4E4LNut6aR6PrTEDHgwM="
               }
             },
             "AppointmentHandlerEventSourceMappingSQSAppointmentsCompletionQueue": {
@@ -816,28 +878,28 @@
                 "Name": "sls-appointment-api-dev-ServerlessDeploymentBucketName"
               }
             },
-            "SwaggerSpecLambdaFunctionQualifiedArn": {
-              "Description": "Current Lambda function version",
-              "Value": {
-                "Ref": "SwaggerSpecLambdaVersionnZpb9gvJTpjYZtTjxMaB5Gb75B4SXmwUy0wbY6KY"
-              },
-              "Export": {
-                "Name": "sls-appointment-api-dev-SwaggerSpecLambdaFunctionQualifiedArn"
-              }
-            },
             "SwaggerLambdaFunctionQualifiedArn": {
               "Description": "Current Lambda function version",
               "Value": {
-                "Ref": "SwaggerLambdaVersion7rASq7wp8Nonmk8pfP1OIP3Kg8Xj13abTm2NaXXIY"
+                "Ref": "SwaggerLambdaVersion9uJrVSm6VQ14MyklLCHyvbYkhCJXUqpqLTr5WQsGDg"
               },
               "Export": {
                 "Name": "sls-appointment-api-dev-SwaggerLambdaFunctionQualifiedArn"
               }
             },
+            "SwaggerSpecLambdaFunctionQualifiedArn": {
+              "Description": "Current Lambda function version",
+              "Value": {
+                "Ref": "SwaggerSpecLambdaVersion7CynI7ivNMPA8lqhuT5G2JuS8OZxwAqhm1qTaDppE"
+              },
+              "Export": {
+                "Name": "sls-appointment-api-dev-SwaggerSpecLambdaFunctionQualifiedArn"
+              }
+            },
             "AppointmentHandlerLambdaFunctionQualifiedArn": {
               "Description": "Current Lambda function version",
               "Value": {
-                "Ref": "AppointmentHandlerLambdaVersionJZhFkguvEcSoDZKsLFNIoNXqPHYuqTgGA4qFK0Zt2Fc"
+                "Ref": "AppointmentHandlerLambdaVersionD7tFape2HTrR75GLIRHCCfgh85VceW1mZ9bnYFsI"
               },
               "Export": {
                 "Name": "sls-appointment-api-dev-AppointmentHandlerLambdaFunctionQualifiedArn"
@@ -894,7 +956,7 @@
         ],
         "artifactsS3KeyDirname": "serverless/appointment-api/dev/code-artifacts",
         "deploymentBucket": "serverless-framework-deployments-us-east-2-91b3aea6-42e2",
-        "artifactDirectoryName": "serverless/appointment-api/dev/1755825371809-2025-08-22T01:16:11.809Z"
+        "artifactDirectoryName": "serverless/appointment-api/dev/1755833396181-2025-08-22T03:29:56.181Z"
       },
       "custom": {
         "tableName": "appointments-table-dev",
@@ -948,7 +1010,7 @@
           "timeout": 6,
           "runtime": "nodejs20.x",
           "vpc": {},
-          "versionLogicalId": "AppointmentHandlerLambdaVersionJZhFkguvEcSoDZKsLFNIoNXqPHYuqTgGA4qFK0Zt2Fc"
+          "versionLogicalId": "AppointmentHandlerLambdaVersionD7tFape2HTrR75GLIRHCCfgh85VceW1mZ9bnYFsI"
         },
         "swagger": {
           "handler": "src/handlers/swagger.ui",
@@ -981,7 +1043,7 @@
           "timeout": 6,
           "runtime": "nodejs20.x",
           "vpc": {},
-          "versionLogicalId": "SwaggerLambdaVersion7rASq7wp8Nonmk8pfP1OIP3Kg8Xj13abTm2NaXXIY"
+          "versionLogicalId": "SwaggerLambdaVersion9uJrVSm6VQ14MyklLCHyvbYkhCJXUqpqLTr5WQsGDg"
         },
         "swaggerSpec": {
           "handler": "src/handlers/swagger.spec",
@@ -1006,7 +1068,7 @@
           "timeout": 6,
           "runtime": "nodejs20.x",
           "vpc": {},
-          "versionLogicalId": "SwaggerSpecLambdaVersionnZpb9gvJTpjYZtTjxMaB5Gb75B4SXmwUy0wbY6KY"
+          "versionLogicalId": "SwaggerSpecLambdaVersion7CynI7ivNMPA8lqhuT5G2JuS8OZxwAqhm1qTaDppE"
         }
       },
       "resources": {
@@ -1213,6 +1275,40 @@
           "Ref": "AppointmentsTopic"
         }
       },
+      "iam": {
+        "role": {
+          "statements": [
+            {
+              "Effect": "Allow",
+              "Action": [
+                "dynamodb:PutItem",
+                "dynamodb:GetItem",
+                "dynamodb:UpdateItem",
+                "dynamodb:Query"
+              ],
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "AppointmentsTable",
+                    "Arn"
+                  ]
+                }
+              ]
+            },
+            {
+              "Effect": "Allow",
+              "Action": [
+                "sns:Publish"
+              ],
+              "Resource": [
+                {
+                  "Ref": "AppointmentsTopic"
+                }
+              ]
+            }
+          ]
+        }
+      },
       "versionFunctions": true,
       "compiledCloudFormationTemplate": {
         "AWSTemplateFormatVersion": "2010-09-09",
@@ -1297,6 +1393,34 @@
                       {
                         "Effect": "Allow",
                         "Action": [
+                          "dynamodb:PutItem",
+                          "dynamodb:GetItem",
+                          "dynamodb:UpdateItem",
+                          "dynamodb:Query"
+                        ],
+                        "Resource": [
+                          {
+                            "Fn::GetAtt": [
+                              "AppointmentsTable",
+                              "Arn"
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "Effect": "Allow",
+                        "Action": [
+                          "sns:Publish"
+                        ],
+                        "Resource": [
+                          {
+                            "Ref": "AppointmentsTopic"
+                          }
+                        ]
+                      },
+                      {
+                        "Effect": "Allow",
+                        "Action": [
                           "sqs:ReceiveMessage",
                           "sqs:DeleteMessage",
                           "sqs:GetQueueAttributes"
@@ -1335,7 +1459,7 @@
             "Properties": {
               "Code": {
                 "S3Bucket": "serverless-framework-deployments-us-east-2-91b3aea6-42e2",
-                "S3Key": "serverless/appointment-api/dev/1755825371809-2025-08-22T01:16:11.809Z/appointment-api-appointmentHandler.zip"
+                "S3Key": "serverless/appointment-api/dev/1755833396181-2025-08-22T03:29:56.181Z/appointment-api-appointmentHandler.zip"
               },
               "Handler": "src/handlers/appointment.handler",
               "Runtime": "nodejs20.x",
@@ -1381,7 +1505,7 @@
             "Properties": {
               "Code": {
                 "S3Bucket": "serverless-framework-deployments-us-east-2-91b3aea6-42e2",
-                "S3Key": "serverless/appointment-api/dev/1755825371809-2025-08-22T01:16:11.809Z/appointment-api-swagger.zip"
+                "S3Key": "serverless/appointment-api/dev/1755833396181-2025-08-22T03:29:56.181Z/appointment-api-swagger.zip"
               },
               "Handler": "src/handlers/swagger.ui",
               "Runtime": "nodejs20.x",
@@ -1427,7 +1551,7 @@
             "Properties": {
               "Code": {
                 "S3Bucket": "serverless-framework-deployments-us-east-2-91b3aea6-42e2",
-                "S3Key": "serverless/appointment-api/dev/1755825371809-2025-08-22T01:16:11.809Z/appointment-api-swaggerSpec.zip"
+                "S3Key": "serverless/appointment-api/dev/1755833396181-2025-08-22T03:29:56.181Z/appointment-api-swaggerSpec.zip"
               },
               "Handler": "src/handlers/swagger.spec",
               "Runtime": "nodejs20.x",
@@ -1468,34 +1592,34 @@
               "SwaggerSpecLogGroup"
             ]
           },
-          "SwaggerSpecLambdaVersionnZpb9gvJTpjYZtTjxMaB5Gb75B4SXmwUy0wbY6KY": {
-            "Type": "AWS::Lambda::Version",
-            "DeletionPolicy": "Retain",
-            "Properties": {
-              "FunctionName": {
-                "Ref": "SwaggerSpecLambdaFunction"
-              },
-              "CodeSha256": "jkyY3AigTO3xOCWc9o6Dqz2qm50V8GoMfAxtsswHYKk="
-            }
-          },
-          "SwaggerLambdaVersion7rASq7wp8Nonmk8pfP1OIP3Kg8Xj13abTm2NaXXIY": {
+          "SwaggerLambdaVersion9uJrVSm6VQ14MyklLCHyvbYkhCJXUqpqLTr5WQsGDg": {
             "Type": "AWS::Lambda::Version",
             "DeletionPolicy": "Retain",
             "Properties": {
               "FunctionName": {
                 "Ref": "SwaggerLambdaFunction"
               },
-              "CodeSha256": "jkyY3AigTO3xOCWc9o6Dqz2qm50V8GoMfAxtsswHYKk="
+              "CodeSha256": "Lm2EtB4KlxNB6JAM/9RJh4Ugt21xp2oLH1ZJIuMyj5o="
             }
           },
-          "AppointmentHandlerLambdaVersionJZhFkguvEcSoDZKsLFNIoNXqPHYuqTgGA4qFK0Zt2Fc": {
+          "SwaggerSpecLambdaVersion7CynI7ivNMPA8lqhuT5G2JuS8OZxwAqhm1qTaDppE": {
+            "Type": "AWS::Lambda::Version",
+            "DeletionPolicy": "Retain",
+            "Properties": {
+              "FunctionName": {
+                "Ref": "SwaggerSpecLambdaFunction"
+              },
+              "CodeSha256": "8pn7BydYs52NrVLWcs7LagwdjDYpoRedAE6yQwGmkcg="
+            }
+          },
+          "AppointmentHandlerLambdaVersionD7tFape2HTrR75GLIRHCCfgh85VceW1mZ9bnYFsI": {
             "Type": "AWS::Lambda::Version",
             "DeletionPolicy": "Retain",
             "Properties": {
               "FunctionName": {
                 "Ref": "AppointmentHandlerLambdaFunction"
               },
-              "CodeSha256": "z6lpowJ3q1kmR+QwFmqN3HgTDlq6zxQBdBpFxP/bQ4E="
+              "CodeSha256": "X15C/ZvcmDcIy773iHiwE3A4E4LNut6aR6PrTEDHgwM="
             }
           },
           "AppointmentHandlerEventSourceMappingSQSAppointmentsCompletionQueue": {
@@ -2007,28 +2131,28 @@
               "Name": "sls-appointment-api-dev-ServerlessDeploymentBucketName"
             }
           },
-          "SwaggerSpecLambdaFunctionQualifiedArn": {
-            "Description": "Current Lambda function version",
-            "Value": {
-              "Ref": "SwaggerSpecLambdaVersionnZpb9gvJTpjYZtTjxMaB5Gb75B4SXmwUy0wbY6KY"
-            },
-            "Export": {
-              "Name": "sls-appointment-api-dev-SwaggerSpecLambdaFunctionQualifiedArn"
-            }
-          },
           "SwaggerLambdaFunctionQualifiedArn": {
             "Description": "Current Lambda function version",
             "Value": {
-              "Ref": "SwaggerLambdaVersion7rASq7wp8Nonmk8pfP1OIP3Kg8Xj13abTm2NaXXIY"
+              "Ref": "SwaggerLambdaVersion9uJrVSm6VQ14MyklLCHyvbYkhCJXUqpqLTr5WQsGDg"
             },
             "Export": {
               "Name": "sls-appointment-api-dev-SwaggerLambdaFunctionQualifiedArn"
             }
           },
+          "SwaggerSpecLambdaFunctionQualifiedArn": {
+            "Description": "Current Lambda function version",
+            "Value": {
+              "Ref": "SwaggerSpecLambdaVersion7CynI7ivNMPA8lqhuT5G2JuS8OZxwAqhm1qTaDppE"
+            },
+            "Export": {
+              "Name": "sls-appointment-api-dev-SwaggerSpecLambdaFunctionQualifiedArn"
+            }
+          },
           "AppointmentHandlerLambdaFunctionQualifiedArn": {
             "Description": "Current Lambda function version",
             "Value": {
-              "Ref": "AppointmentHandlerLambdaVersionJZhFkguvEcSoDZKsLFNIoNXqPHYuqTgGA4qFK0Zt2Fc"
+              "Ref": "AppointmentHandlerLambdaVersionD7tFape2HTrR75GLIRHCCfgh85VceW1mZ9bnYFsI"
             },
             "Export": {
               "Name": "sls-appointment-api-dev-AppointmentHandlerLambdaFunctionQualifiedArn"
@@ -2081,7 +2205,7 @@
       "serviceProvider": null,
       "instanceParameters": null
     },
-    "serviceRawFile": "# \"org\" ensures this Service is used with the correct Serverless Framework Access Key.\norg: aivoxia\nservice: appointment-api\n\nprovider:\n  name: aws\n  runtime: nodejs20.x\n  region: ${opt:region, 'us-east-2'}\n  stage: ${opt:stage, 'dev'}\n  # Añadimos tags que se aplicarán a todos los recursos de la stack\n  tags:\n    app-id: test-medical-appoinments\n    app-center-cost: test-medical-appoinments\n    app-env: test\n  environment:\n    DYNAMODB_TABLE_APPOINTMENTS: ${self:custom.tableName}\n    SNS_TOPIC_APPOINTMENTS_ARN: { \"Ref\": \"AppointmentsTopic\" }\n\nplugins:\n  - serverless-offline\n  - serverless-dynamodb-local\n\npackage:\n  individually: true\n  patterns:\n    - '!node_modules/**'\n    - 'node_modules/swagger-ui-dist/**' # Incluir los assets de Swagger UI\n    - 'openapi.yaml' # Incluir el archivo de especificación\n\ncustom:\n  tableName: appointments-table-${self:provider.stage}\n  dynamodb:\n    start:\n      port: 8000\n      inMemory: true\n      migrate: true\n\nfunctions:\n  appointmentHandler:\n    handler: src/handlers/appointment.handler\n    events:\n      - httpApi:\n          path: /appointments\n          method: post\n      - httpApi:\n          path: /appointments/{insuredId}\n          method: get\n      - sqs:\n          arn:\n            Fn::GetAtt: [AppointmentsCompletionQueue, Arn]\n  \n  swagger:\n    handler: src/handlers/swagger.ui\n    events:\n      - httpApi:\n          path: /docs\n          method: get\n      - httpApi: # Ruta para los assets de Swagger UI\n          path: /docs/{proxy+}\n          method: get\n  \n  swaggerSpec:\n    handler: src/handlers/swagger.spec\n    events:\n      - httpApi:\n          path: /openapi.yaml\n          method: get\n\nresources:\n  Resources:\n    AppointmentsTable:\n      Type: AWS::DynamoDB::Table\n      Properties:\n        TableName: ${self:custom.tableName}\n        AttributeDefinitions:\n          - AttributeName: insuredId\n            AttributeType: S\n          - AttributeName: appointmentId\n            AttributeType: S\n        KeySchema:\n          - AttributeName: insuredId\n            KeyType: HASH\n          - AttributeName: appointmentId\n            KeyType: RANGE\n        BillingMode: PAY_PER_REQUEST\n    \n    AppointmentsTopic:\n      Type: AWS::SNS::Topic\n      Properties:\n        TopicName: appointments-topic-${self:provider.stage}\n\n    AppointmentsQueuePE:\n      Type: AWS::SQS::Queue\n      Properties:\n        QueueName: appointments-queue-pe-${self:provider.stage}\n\n    AppointmentsQueueCL:\n      Type: AWS::SQS::Queue\n      Properties:\n        QueueName: appointments-queue-cl-${self:provider.stage}\n\n    SnsSubscriptionPE:\n      Type: AWS::SNS::Subscription\n      Properties:\n        Protocol: sqs\n        Endpoint: { \"Fn::GetAtt\": [\"AppointmentsQueuePE\", \"Arn\"] }\n        TopicArn: { \"Ref\": \"AppointmentsTopic\" }\n        FilterPolicy:\n          countryISO: [\"PE\"]\n        RawMessageDelivery: \"true\"\n\n    SnsSubscriptionCL:\n      Type: AWS::SNS::Subscription\n      Properties:\n        Protocol: sqs\n        Endpoint: { \"Fn::GetAtt\": [\"AppointmentsQueueCL\", \"Arn\"] }\n        TopicArn: { \"Ref\": \"AppointmentsTopic\" }\n        FilterPolicy:\n          countryISO: [\"CL\"]\n        RawMessageDelivery: \"true\"\n\n    SqsPolicy:\n      Type: AWS::SQS::QueuePolicy\n      Properties:\n        Queues:\n          - { \"Ref\": \"AppointmentsQueuePE\" }\n          - { \"Ref\": \"AppointmentsQueueCL\" }\n        PolicyDocument:\n          Statement:\n            - Effect: \"Allow\"\n              Principal:\n                Service: \"sns.amazonaws.com\"\n              Action: \"sqs:SendMessage\"\n              Resource: \"*\"\n              Condition:\n                ArnEquals:\n                  aws:SourceArn: { \"Ref\": \"AppointmentsTopic\" }\n    \n    AppointmentEventBus:\n      Type: AWS::Events::EventBus\n      Properties:\n        Name: appointment-event-bus-${self:provider.stage}\n        \n    AppointmentsCompletionQueue:\n      Type: AWS::SQS::Queue\n      Properties:\n        QueueName: appointments-completion-queue-${self:provider.stage}\n        \n    EventBusToSqsRule:\n      Type: AWS::Events::Rule\n      Properties:\n        EventBusName: { \"Ref\": \"AppointmentEventBus\" }\n        EventPattern:\n          source:\n            - \"appointment.processor\"\n        Targets:\n          - Arn: { \"Fn::GetAtt\": [\"AppointmentsCompletionQueue\", \"Arn\"] }\n            Id: \"CompletionQueueTarget\"\n            \n    EventBridgeToSqsPolicy:\n      Type: AWS::SQS::QueuePolicy\n      Properties:\n        Queues:\n          - Ref: AppointmentsCompletionQueue\n        PolicyDocument:\n          Statement:\n            - Effect: Allow\n              Principal:\n                Service: events.amazonaws.com\n              Action: sqs:SendMessage\n              Resource: { \"Fn::GetAtt\": [\"AppointmentsCompletionQueue\", \"Arn\"] }\n",
+    "serviceRawFile": "# \"org\" ensures this Service is used with the correct Serverless Framework Access Key.\norg: aivoxia\nservice: appointment-api\n\nprovider:\n  name: aws\n  runtime: nodejs20.x\n  region: ${opt:region, 'us-east-2'}\n  stage: ${opt:stage, 'dev'}\n  # Añadimos tags que se aplicarán a todos los recursos de la stack\n  tags:\n    app-id: test-medical-appoinments\n    app-center-cost: test-medical-appoinments\n    app-env: test\n  environment:\n    DYNAMODB_TABLE_APPOINTMENTS: ${self:custom.tableName}\n    SNS_TOPIC_APPOINTMENTS_ARN: { \"Ref\": \"AppointmentsTopic\" }\n\n  iam:\n    role:\n      statements:\n        # Permisos\n        - Effect: \"Allow\"\n          Action:\n            - dynamodb:PutItem\n            - dynamodb:GetItem\n            - dynamodb:UpdateItem\n            - dynamodb:Query\n          Resource:\n            - Fn::GetAtt: [AppointmentsTable, Arn]\n            \n        - Effect: \"Allow\"\n          Action:\n            - sns:Publish\n          Resource:\n            - Ref: AppointmentsTopic\n\nplugins:\n  - serverless-offline\n  - serverless-dynamodb-local\n\npackage:\n  individually: true\n  patterns:\n    - '!node_modules/**'\n    - 'node_modules/swagger-ui-dist/**' # Incluir los assets de Swagger UI\n    - 'openapi.yaml' # Incluir el archivo de especificación\n\ncustom:\n  tableName: appointments-table-${self:provider.stage}\n  dynamodb:\n    start:\n      port: 8000\n      inMemory: true\n      migrate: true\n\nfunctions:\n  appointmentHandler:\n    handler: src/handlers/appointment.handler\n    events:\n      - httpApi:\n          path: /appointments\n          method: post\n      - httpApi:\n          path: /appointments/{insuredId}\n          method: get\n      - sqs:\n          arn:\n            Fn::GetAtt: [AppointmentsCompletionQueue, Arn]\n  \n  swagger:\n    handler: src/handlers/swagger.ui\n    events:\n      - httpApi:\n          path: /docs\n          method: get\n      - httpApi: # Ruta para los assets de Swagger UI\n          path: /docs/{proxy+}\n          method: get\n  \n  swaggerSpec:\n    handler: src/handlers/swagger.spec\n    events:\n      - httpApi:\n          path: /openapi.yaml\n          method: get\n\nresources:\n  Resources:\n    AppointmentsTable:\n      Type: AWS::DynamoDB::Table\n      Properties:\n        TableName: ${self:custom.tableName}\n        AttributeDefinitions:\n          - AttributeName: insuredId\n            AttributeType: S\n          - AttributeName: appointmentId\n            AttributeType: S\n        KeySchema:\n          - AttributeName: insuredId\n            KeyType: HASH\n          - AttributeName: appointmentId\n            KeyType: RANGE\n        BillingMode: PAY_PER_REQUEST\n    \n    AppointmentsTopic:\n      Type: AWS::SNS::Topic\n      Properties:\n        TopicName: appointments-topic-${self:provider.stage}\n\n    AppointmentsQueuePE:\n      Type: AWS::SQS::Queue\n      Properties:\n        QueueName: appointments-queue-pe-${self:provider.stage}\n\n    AppointmentsQueueCL:\n      Type: AWS::SQS::Queue\n      Properties:\n        QueueName: appointments-queue-cl-${self:provider.stage}\n\n    SnsSubscriptionPE:\n      Type: AWS::SNS::Subscription\n      Properties:\n        Protocol: sqs\n        Endpoint: { \"Fn::GetAtt\": [\"AppointmentsQueuePE\", \"Arn\"] }\n        TopicArn: { \"Ref\": \"AppointmentsTopic\" }\n        FilterPolicy:\n          countryISO: [\"PE\"]\n        RawMessageDelivery: \"true\"\n\n    SnsSubscriptionCL:\n      Type: AWS::SNS::Subscription\n      Properties:\n        Protocol: sqs\n        Endpoint: { \"Fn::GetAtt\": [\"AppointmentsQueueCL\", \"Arn\"] }\n        TopicArn: { \"Ref\": \"AppointmentsTopic\" }\n        FilterPolicy:\n          countryISO: [\"CL\"]\n        RawMessageDelivery: \"true\"\n\n    SqsPolicy:\n      Type: AWS::SQS::QueuePolicy\n      Properties:\n        Queues:\n          - { \"Ref\": \"AppointmentsQueuePE\" }\n          - { \"Ref\": \"AppointmentsQueueCL\" }\n        PolicyDocument:\n          Statement:\n            - Effect: \"Allow\"\n              Principal:\n                Service: \"sns.amazonaws.com\"\n              Action: \"sqs:SendMessage\"\n              Resource: \"*\"\n              Condition:\n                ArnEquals:\n                  aws:SourceArn: { \"Ref\": \"AppointmentsTopic\" }\n    \n    AppointmentEventBus:\n      Type: AWS::Events::EventBus\n      Properties:\n        Name: appointment-event-bus-${self:provider.stage}\n        \n    AppointmentsCompletionQueue:\n      Type: AWS::SQS::Queue\n      Properties:\n        QueueName: appointments-completion-queue-${self:provider.stage}\n        \n    EventBusToSqsRule:\n      Type: AWS::Events::Rule\n      Properties:\n        EventBusName: { \"Ref\": \"AppointmentEventBus\" }\n        EventPattern:\n          source:\n            - \"appointment.processor\"\n        Targets:\n          - Arn: { \"Fn::GetAtt\": [\"AppointmentsCompletionQueue\", \"Arn\"] }\n            Id: \"CompletionQueueTarget\"\n            \n    EventBridgeToSqsPolicy:\n      Type: AWS::SQS::QueuePolicy\n      Properties:\n        Queues:\n          - Ref: AppointmentsCompletionQueue\n        PolicyDocument:\n          Statement:\n            - Effect: Allow\n              Principal:\n                Service: events.amazonaws.com\n              Action: sqs:SendMessage\n              Resource: { \"Fn::GetAtt\": [\"AppointmentsCompletionQueue\", \"Arn\"] }",
     "command": [
       "deploy"
     ],
@@ -2096,24 +2220,24 @@
     "serviceProviderAwsCfStackName": "appointment-api-dev",
     "serviceProviderAwsCfStackId": "arn:aws:cloudformation:us-east-2:941958612220:stack/appointment-api-dev/9b375f30-7ef5-11f0-a17b-020556722a75",
     "serviceProviderAwsCfStackCreated": "2025-08-22T01:16:18.633Z",
-    "serviceProviderAwsCfStackUpdated": null,
-    "serviceProviderAwsCfStackStatus": "CREATE_COMPLETE",
+    "serviceProviderAwsCfStackUpdated": "2025-08-22T03:25:21.264Z",
+    "serviceProviderAwsCfStackStatus": "UPDATE_COMPLETE",
     "serviceProviderAwsCfStackOutputs": [
       {
         "OutputKey": "SwaggerLambdaFunctionQualifiedArn",
-        "OutputValue": "arn:aws:lambda:us-east-2:941958612220:function:appointment-api-dev-swagger:1",
+        "OutputValue": "arn:aws:lambda:us-east-2:941958612220:function:appointment-api-dev-swagger:4",
         "Description": "Current Lambda function version",
         "ExportName": "sls-appointment-api-dev-SwaggerLambdaFunctionQualifiedArn"
       },
       {
         "OutputKey": "AppointmentHandlerLambdaFunctionQualifiedArn",
-        "OutputValue": "arn:aws:lambda:us-east-2:941958612220:function:appointment-api-dev-appointmentHandler:1",
+        "OutputValue": "arn:aws:lambda:us-east-2:941958612220:function:appointment-api-dev-appointmentHandler:4",
         "Description": "Current Lambda function version",
         "ExportName": "sls-appointment-api-dev-AppointmentHandlerLambdaFunctionQualifiedArn"
       },
       {
         "OutputKey": "SwaggerSpecLambdaFunctionQualifiedArn",
-        "OutputValue": "arn:aws:lambda:us-east-2:941958612220:function:appointment-api-dev-swaggerSpec:1",
+        "OutputValue": "arn:aws:lambda:us-east-2:941958612220:function:appointment-api-dev-swaggerSpec:4",
         "Description": "Current Lambda function version",
         "ExportName": "sls-appointment-api-dev-SwaggerSpecLambdaFunctionQualifiedArn"
       },
@@ -2218,6 +2342,34 @@
                     {
                       "Effect": "Allow",
                       "Action": [
+                        "dynamodb:PutItem",
+                        "dynamodb:GetItem",
+                        "dynamodb:UpdateItem",
+                        "dynamodb:Query"
+                      ],
+                      "Resource": [
+                        {
+                          "Fn::GetAtt": [
+                            "AppointmentsTable",
+                            "Arn"
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "Effect": "Allow",
+                      "Action": [
+                        "sns:Publish"
+                      ],
+                      "Resource": [
+                        {
+                          "Ref": "AppointmentsTopic"
+                        }
+                      ]
+                    },
+                    {
+                      "Effect": "Allow",
+                      "Action": [
                         "sqs:ReceiveMessage",
                         "sqs:DeleteMessage",
                         "sqs:GetQueueAttributes"
@@ -2256,7 +2408,7 @@
           "Properties": {
             "Code": {
               "S3Bucket": "serverless-framework-deployments-us-east-2-91b3aea6-42e2",
-              "S3Key": "serverless/appointment-api/dev/1755825371809-2025-08-22T01:16:11.809Z/appointment-api-appointmentHandler.zip"
+              "S3Key": "serverless/appointment-api/dev/1755833396181-2025-08-22T03:29:56.181Z/appointment-api-appointmentHandler.zip"
             },
             "Handler": "src/handlers/appointment.handler",
             "Runtime": "nodejs20.x",
@@ -2302,7 +2454,7 @@
           "Properties": {
             "Code": {
               "S3Bucket": "serverless-framework-deployments-us-east-2-91b3aea6-42e2",
-              "S3Key": "serverless/appointment-api/dev/1755825371809-2025-08-22T01:16:11.809Z/appointment-api-swagger.zip"
+              "S3Key": "serverless/appointment-api/dev/1755833396181-2025-08-22T03:29:56.181Z/appointment-api-swagger.zip"
             },
             "Handler": "src/handlers/swagger.ui",
             "Runtime": "nodejs20.x",
@@ -2348,7 +2500,7 @@
           "Properties": {
             "Code": {
               "S3Bucket": "serverless-framework-deployments-us-east-2-91b3aea6-42e2",
-              "S3Key": "serverless/appointment-api/dev/1755825371809-2025-08-22T01:16:11.809Z/appointment-api-swaggerSpec.zip"
+              "S3Key": "serverless/appointment-api/dev/1755833396181-2025-08-22T03:29:56.181Z/appointment-api-swaggerSpec.zip"
             },
             "Handler": "src/handlers/swagger.spec",
             "Runtime": "nodejs20.x",
@@ -2389,34 +2541,34 @@
             "SwaggerSpecLogGroup"
           ]
         },
-        "SwaggerSpecLambdaVersionnZpb9gvJTpjYZtTjxMaB5Gb75B4SXmwUy0wbY6KY": {
-          "Type": "AWS::Lambda::Version",
-          "DeletionPolicy": "Retain",
-          "Properties": {
-            "FunctionName": {
-              "Ref": "SwaggerSpecLambdaFunction"
-            },
-            "CodeSha256": "jkyY3AigTO3xOCWc9o6Dqz2qm50V8GoMfAxtsswHYKk="
-          }
-        },
-        "SwaggerLambdaVersion7rASq7wp8Nonmk8pfP1OIP3Kg8Xj13abTm2NaXXIY": {
+        "SwaggerLambdaVersion9uJrVSm6VQ14MyklLCHyvbYkhCJXUqpqLTr5WQsGDg": {
           "Type": "AWS::Lambda::Version",
           "DeletionPolicy": "Retain",
           "Properties": {
             "FunctionName": {
               "Ref": "SwaggerLambdaFunction"
             },
-            "CodeSha256": "jkyY3AigTO3xOCWc9o6Dqz2qm50V8GoMfAxtsswHYKk="
+            "CodeSha256": "Lm2EtB4KlxNB6JAM/9RJh4Ugt21xp2oLH1ZJIuMyj5o="
           }
         },
-        "AppointmentHandlerLambdaVersionJZhFkguvEcSoDZKsLFNIoNXqPHYuqTgGA4qFK0Zt2Fc": {
+        "SwaggerSpecLambdaVersion7CynI7ivNMPA8lqhuT5G2JuS8OZxwAqhm1qTaDppE": {
+          "Type": "AWS::Lambda::Version",
+          "DeletionPolicy": "Retain",
+          "Properties": {
+            "FunctionName": {
+              "Ref": "SwaggerSpecLambdaFunction"
+            },
+            "CodeSha256": "8pn7BydYs52NrVLWcs7LagwdjDYpoRedAE6yQwGmkcg="
+          }
+        },
+        "AppointmentHandlerLambdaVersionD7tFape2HTrR75GLIRHCCfgh85VceW1mZ9bnYFsI": {
           "Type": "AWS::Lambda::Version",
           "DeletionPolicy": "Retain",
           "Properties": {
             "FunctionName": {
               "Ref": "AppointmentHandlerLambdaFunction"
             },
-            "CodeSha256": "z6lpowJ3q1kmR+QwFmqN3HgTDlq6zxQBdBpFxP/bQ4E="
+            "CodeSha256": "X15C/ZvcmDcIy773iHiwE3A4E4LNut6aR6PrTEDHgwM="
           }
         },
         "AppointmentHandlerEventSourceMappingSQSAppointmentsCompletionQueue": {
@@ -2928,28 +3080,28 @@
             "Name": "sls-appointment-api-dev-ServerlessDeploymentBucketName"
           }
         },
-        "SwaggerSpecLambdaFunctionQualifiedArn": {
-          "Description": "Current Lambda function version",
-          "Value": {
-            "Ref": "SwaggerSpecLambdaVersionnZpb9gvJTpjYZtTjxMaB5Gb75B4SXmwUy0wbY6KY"
-          },
-          "Export": {
-            "Name": "sls-appointment-api-dev-SwaggerSpecLambdaFunctionQualifiedArn"
-          }
-        },
         "SwaggerLambdaFunctionQualifiedArn": {
           "Description": "Current Lambda function version",
           "Value": {
-            "Ref": "SwaggerLambdaVersion7rASq7wp8Nonmk8pfP1OIP3Kg8Xj13abTm2NaXXIY"
+            "Ref": "SwaggerLambdaVersion9uJrVSm6VQ14MyklLCHyvbYkhCJXUqpqLTr5WQsGDg"
           },
           "Export": {
             "Name": "sls-appointment-api-dev-SwaggerLambdaFunctionQualifiedArn"
           }
         },
+        "SwaggerSpecLambdaFunctionQualifiedArn": {
+          "Description": "Current Lambda function version",
+          "Value": {
+            "Ref": "SwaggerSpecLambdaVersion7CynI7ivNMPA8lqhuT5G2JuS8OZxwAqhm1qTaDppE"
+          },
+          "Export": {
+            "Name": "sls-appointment-api-dev-SwaggerSpecLambdaFunctionQualifiedArn"
+          }
+        },
         "AppointmentHandlerLambdaFunctionQualifiedArn": {
           "Description": "Current Lambda function version",
           "Value": {
-            "Ref": "AppointmentHandlerLambdaVersionJZhFkguvEcSoDZKsLFNIoNXqPHYuqTgGA4qFK0Zt2Fc"
+            "Ref": "AppointmentHandlerLambdaVersionD7tFape2HTrR75GLIRHCCfgh85VceW1mZ9bnYFsI"
           },
           "Export": {
             "Name": "sls-appointment-api-dev-AppointmentHandlerLambdaFunctionQualifiedArn"

@@ -23,9 +23,9 @@ export class AppError extends Error {
 }
 
 export class BadRequestError extends AppError {
-  constructor(errors?: object[],message?: string ) {
+  constructor(errors?: object[], message?: string) {
     super(
-      message??"La solicitud contiene datos inválidos.",
+      message ?? "La solicitud contiene datos inválidos.",
       ErrorCode.BadRequest,
       HttpStatusCode.BAD_REQUEST,
       errors
@@ -35,6 +35,6 @@ export class BadRequestError extends AppError {
 
 export class NotFoundError extends AppError {
   constructor(message: string = "Recurso no encontrado") {
-    super(message, 404);
+    super(message, ErrorCode.NotFound, HttpStatusCode.NOT_FOUND);
   }
 }

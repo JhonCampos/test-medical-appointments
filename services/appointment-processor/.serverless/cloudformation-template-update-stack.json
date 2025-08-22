@@ -75,6 +75,28 @@
                 {
                   "Effect": "Allow",
                   "Action": [
+                    "events:PutEvents"
+                  ],
+                  "Resource": [
+                    {
+                      "Fn::Join": [
+                        "",
+                        [
+                          "arn:aws:events:",
+                          "us-east-2",
+                          ":",
+                          {
+                            "Ref": "AWS::AccountId"
+                          },
+                          ":event-bus/appointment-event-bus-dev"
+                        ]
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
                     "sqs:ReceiveMessage",
                     "sqs:DeleteMessage",
                     "sqs:GetQueueAttributes"
@@ -133,7 +155,7 @@
       "Properties": {
         "Code": {
           "S3Bucket": "serverless-framework-deployments-us-east-2-91b3aea6-42e2",
-          "S3Key": "serverless/appointment-processor/dev/1755825670903-2025-08-22T01:21:10.903Z/appointment-processor-processPE.zip"
+          "S3Key": "serverless/appointment-processor/dev/1755833557349-2025-08-22T03:32:37.349Z/appointment-processor-processPE.zip"
         },
         "Handler": "src/handlers/processPE.handler",
         "Runtime": "nodejs20.x",
@@ -176,7 +198,7 @@
       "Properties": {
         "Code": {
           "S3Bucket": "serverless-framework-deployments-us-east-2-91b3aea6-42e2",
-          "S3Key": "serverless/appointment-processor/dev/1755825670903-2025-08-22T01:21:10.903Z/appointment-processor-processCL.zip"
+          "S3Key": "serverless/appointment-processor/dev/1755833557349-2025-08-22T03:32:37.349Z/appointment-processor-processCL.zip"
         },
         "Handler": "src/handlers/processCL.handler",
         "Runtime": "nodejs20.x",
@@ -214,24 +236,24 @@
         "ProcessCLLogGroup"
       ]
     },
-    "ProcessPELambdaVersionYNVWi8EbXslB40VoMYuQJBMsL1aFJgEJbW7eg6tlrE": {
+    "ProcessPELambdaVersion8CeQwnDbSybDsk58GgHP6MeTIAuEDZnGEy6V0ZDg4": {
       "Type": "AWS::Lambda::Version",
       "DeletionPolicy": "Retain",
       "Properties": {
         "FunctionName": {
           "Ref": "ProcessPELambdaFunction"
         },
-        "CodeSha256": "FUgwaD5rzUgZPEvw0KxqZGOXD4HJ8XT2s6TfAaq8u/w="
+        "CodeSha256": "G23xkmU90jDwfApJ87AqDT1BaG/qtndkxiSxK07+CAg="
       }
     },
-    "ProcessCLLambdaVersion35wL1Yov8oXv8BERff2YCuinsuVvBfAjEoeYwXFmPM": {
+    "ProcessCLLambdaVersionkMQMl03lt3vuBbiI3FbCdmRVLXd5GefNaELgqf2SgtI": {
       "Type": "AWS::Lambda::Version",
       "DeletionPolicy": "Retain",
       "Properties": {
         "FunctionName": {
           "Ref": "ProcessCLLambdaFunction"
         },
-        "CodeSha256": "3gTXe2G+7i/pfBUgrdmHEqgSrFiw5OM8wvpsm58frkA="
+        "CodeSha256": "H8SGpfs6zBbxJCQmVubx/Y4WG6EviFBigRec1/s6ZiI="
       }
     },
     "ProcessPEEventSourceMappingSQSAppointmentsqueuepedev": {
@@ -303,7 +325,7 @@
     "ProcessPELambdaFunctionQualifiedArn": {
       "Description": "Current Lambda function version",
       "Value": {
-        "Ref": "ProcessPELambdaVersionYNVWi8EbXslB40VoMYuQJBMsL1aFJgEJbW7eg6tlrE"
+        "Ref": "ProcessPELambdaVersion8CeQwnDbSybDsk58GgHP6MeTIAuEDZnGEy6V0ZDg4"
       },
       "Export": {
         "Name": "sls-appointment-processor-dev-ProcessPELambdaFunctionQualifiedArn"
@@ -312,7 +334,7 @@
     "ProcessCLLambdaFunctionQualifiedArn": {
       "Description": "Current Lambda function version",
       "Value": {
-        "Ref": "ProcessCLLambdaVersion35wL1Yov8oXv8BERff2YCuinsuVvBfAjEoeYwXFmPM"
+        "Ref": "ProcessCLLambdaVersionkMQMl03lt3vuBbiI3FbCdmRVLXd5GefNaELgqf2SgtI"
       },
       "Export": {
         "Name": "sls-appointment-processor-dev-ProcessCLLambdaFunctionQualifiedArn"

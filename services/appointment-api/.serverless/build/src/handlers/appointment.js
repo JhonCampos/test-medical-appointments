@@ -19132,6 +19132,16 @@ var AppError = class extends Error {
     this.errors = errors;
   }
 };
+var BadRequestError = class extends AppError {
+  constructor(errors, message) {
+    super(
+      message ?? "La solicitud contiene datos inv\xE1lidos.",
+      "BAD_REQUEST" /* BadRequest */,
+      400 /* BAD_REQUEST */,
+      errors
+    );
+  }
+};
 
 // ../../packages/core/src/application/use-cases/UpdateAppointmentStatus.ts
 var UpdateAppointmentStatusUseCase = class {
@@ -19161,8 +19171,8 @@ var UpdateAppointmentStatusUseCase = class {
 
 // ../../packages/core/src/application/use-cases/ProcessAppointmentPE.ts
 var ProcessAppointmentPEUseCase = class {
-  constructor(rdsRepository, confirmationPublisher) {
-    this.rdsRepository = rdsRepository;
+  constructor(countryRepository, confirmationPublisher) {
+    this.countryRepository = countryRepository;
     this.confirmationPublisher = confirmationPublisher;
   }
   /**
@@ -19176,7 +19186,7 @@ var ProcessAppointmentPEUseCase = class {
       updatedAt: new Date(appointmentEvent.createdAt).toISOString()
     };
     console.log(`Executing Peru-specific appointment processing for ID: ${appointmentEvent.appointmentId}`);
-    await this.rdsRepository.save(appointmentToSave);
+    await this.countryRepository.save(appointmentToSave);
     await this.confirmationPublisher.publish({
       appointmentId: appointmentToSave.appointmentId,
       insuredId: appointmentToSave.insuredId,
@@ -19187,8 +19197,8 @@ var ProcessAppointmentPEUseCase = class {
 
 // ../../packages/core/src/application/use-cases/ProcessAppointmentCL.ts
 var ProcessAppointmentCLUseCase = class {
-  constructor(rdsRepository, confirmationPublisher) {
-    this.rdsRepository = rdsRepository;
+  constructor(countryRepository, confirmationPublisher) {
+    this.countryRepository = countryRepository;
     this.confirmationPublisher = confirmationPublisher;
   }
   /**
@@ -19202,7 +19212,7 @@ var ProcessAppointmentCLUseCase = class {
       updatedAt: new Date(appointmentEvent.createdAt).toISOString()
     };
     console.log(`Executing Chile-specific appointment processing for ID: ${appointmentEvent.appointmentId}`);
-    await this.rdsRepository.save(appointmentToSave);
+    await this.countryRepository.save(appointmentToSave);
     await this.confirmationPublisher.publish({
       appointmentId: appointmentToSave.appointmentId,
       insuredId: appointmentToSave.insuredId,
@@ -19368,12 +19378,12 @@ var EventBridgePublisher = class {
 
 // ../../packages/infrastructure/src/di/container.ts
 var container = (0, import_awilix.createContainer)({
-  injectionMode: import_awilix.InjectionMode.PROXY
+  injectionMode: import_awilix.InjectionMode.CLASSIC
 });
 container.register({
   // Repositorios
   appointmentRepository: (0, import_awilix.asClass)(DynamoDbAppointmentRepository).singleton(),
-  rdsRepository: (0, import_awilix.asClass)(AppointmentRdsRepository).singleton(),
+  countryRepository: (0, import_awilix.asClass)(AppointmentRdsRepository).singleton(),
   // Publicadores de Eventos
   eventPublisher: (0, import_awilix.asClass)(SnsEventPublisher).singleton(),
   confirmationPublisher: (0, import_awilix.asClass)(EventBridgePublisher).singleton(),
@@ -19451,13 +19461,7 @@ function validateAndParse(schema, data) {
     return schema.parse(data);
   } catch (error43) {
     if (error43 instanceof ZodError) {
-      throw new AppError(
-        "La solicitud contiene datos inv\xE1lidos.",
-        "BAD_REQUEST" /* BadRequest */,
-        400 /* BAD_REQUEST */,
-        error43.issues
-        // Corregido: de 'errors' a 'issues'
-      );
+      throw new BadRequestError(error43.issues);
     }
     throw error43;
   }

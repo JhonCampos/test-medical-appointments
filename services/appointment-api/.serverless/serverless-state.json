@@ -20,6 +20,40 @@
           "Ref": "AppointmentsTopic"
         }
       },
+      "iam": {
+        "role": {
+          "statements": [
+            {
+              "Effect": "Allow",
+              "Action": [
+                "dynamodb:PutItem",
+                "dynamodb:GetItem",
+                "dynamodb:UpdateItem",
+                "dynamodb:Query"
+              ],
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "AppointmentsTable",
+                    "Arn"
+                  ]
+                }
+              ]
+            },
+            {
+              "Effect": "Allow",
+              "Action": [
+                "sns:Publish"
+              ],
+              "Resource": [
+                {
+                  "Ref": "AppointmentsTopic"
+                }
+              ]
+            }
+          ]
+        }
+      },
       "versionFunctions": true,
       "compiledCloudFormationTemplate": {
         "AWSTemplateFormatVersion": "2010-09-09",
@@ -102,6 +136,12 @@
                         ]
                       },
                       {
+                        "$ref": "$[\"service\"][\"provider\"][\"iam\"][\"role\"][\"statements\"][0]"
+                      },
+                      {
+                        "$ref": "$[\"service\"][\"provider\"][\"iam\"][\"role\"][\"statements\"][1]"
+                      },
+                      {
                         "Effect": "Allow",
                         "Action": [
                           "sqs:ReceiveMessage",
@@ -142,7 +182,7 @@
             "Properties": {
               "Code": {
                 "S3Bucket": "serverless-framework-deployments-us-east-2-91b3aea6-42e2",
-                "S3Key": "serverless/appointment-api/dev/1755825371809-2025-08-22T01:16:11.809Z/appointment-api-appointmentHandler.zip"
+                "S3Key": "serverless/appointment-api/dev/1755833396181-2025-08-22T03:29:56.181Z/appointment-api-appointmentHandler.zip"
               },
               "Handler": "src/handlers/appointment.handler",
               "Runtime": "nodejs20.x",
@@ -188,7 +228,7 @@
             "Properties": {
               "Code": {
                 "S3Bucket": "serverless-framework-deployments-us-east-2-91b3aea6-42e2",
-                "S3Key": "serverless/appointment-api/dev/1755825371809-2025-08-22T01:16:11.809Z/appointment-api-swagger.zip"
+                "S3Key": "serverless/appointment-api/dev/1755833396181-2025-08-22T03:29:56.181Z/appointment-api-swagger.zip"
               },
               "Handler": "src/handlers/swagger.ui",
               "Runtime": "nodejs20.x",
@@ -234,7 +274,7 @@
             "Properties": {
               "Code": {
                 "S3Bucket": "serverless-framework-deployments-us-east-2-91b3aea6-42e2",
-                "S3Key": "serverless/appointment-api/dev/1755825371809-2025-08-22T01:16:11.809Z/appointment-api-swaggerSpec.zip"
+                "S3Key": "serverless/appointment-api/dev/1755833396181-2025-08-22T03:29:56.181Z/appointment-api-swaggerSpec.zip"
               },
               "Handler": "src/handlers/swagger.spec",
               "Runtime": "nodejs20.x",
@@ -275,34 +315,34 @@
               "SwaggerSpecLogGroup"
             ]
           },
-          "SwaggerSpecLambdaVersionnZpb9gvJTpjYZtTjxMaB5Gb75B4SXmwUy0wbY6KY": {
-            "Type": "AWS::Lambda::Version",
-            "DeletionPolicy": "Retain",
-            "Properties": {
-              "FunctionName": {
-                "Ref": "SwaggerSpecLambdaFunction"
-              },
-              "CodeSha256": "jkyY3AigTO3xOCWc9o6Dqz2qm50V8GoMfAxtsswHYKk="
-            }
-          },
-          "SwaggerLambdaVersion7rASq7wp8Nonmk8pfP1OIP3Kg8Xj13abTm2NaXXIY": {
+          "SwaggerLambdaVersion9uJrVSm6VQ14MyklLCHyvbYkhCJXUqpqLTr5WQsGDg": {
             "Type": "AWS::Lambda::Version",
             "DeletionPolicy": "Retain",
             "Properties": {
               "FunctionName": {
                 "Ref": "SwaggerLambdaFunction"
               },
-              "CodeSha256": "jkyY3AigTO3xOCWc9o6Dqz2qm50V8GoMfAxtsswHYKk="
+              "CodeSha256": "Lm2EtB4KlxNB6JAM/9RJh4Ugt21xp2oLH1ZJIuMyj5o="
             }
           },
-          "AppointmentHandlerLambdaVersionJZhFkguvEcSoDZKsLFNIoNXqPHYuqTgGA4qFK0Zt2Fc": {
+          "SwaggerSpecLambdaVersion7CynI7ivNMPA8lqhuT5G2JuS8OZxwAqhm1qTaDppE": {
+            "Type": "AWS::Lambda::Version",
+            "DeletionPolicy": "Retain",
+            "Properties": {
+              "FunctionName": {
+                "Ref": "SwaggerSpecLambdaFunction"
+              },
+              "CodeSha256": "8pn7BydYs52NrVLWcs7LagwdjDYpoRedAE6yQwGmkcg="
+            }
+          },
+          "AppointmentHandlerLambdaVersionD7tFape2HTrR75GLIRHCCfgh85VceW1mZ9bnYFsI": {
             "Type": "AWS::Lambda::Version",
             "DeletionPolicy": "Retain",
             "Properties": {
               "FunctionName": {
                 "Ref": "AppointmentHandlerLambdaFunction"
               },
-              "CodeSha256": "z6lpowJ3q1kmR+QwFmqN3HgTDlq6zxQBdBpFxP/bQ4E="
+              "CodeSha256": "X15C/ZvcmDcIy773iHiwE3A4E4LNut6aR6PrTEDHgwM="
             }
           },
           "AppointmentHandlerEventSourceMappingSQSAppointmentsCompletionQueue": {
@@ -805,28 +845,28 @@
               "Name": "sls-appointment-api-dev-ServerlessDeploymentBucketName"
             }
           },
-          "SwaggerSpecLambdaFunctionQualifiedArn": {
-            "Description": "Current Lambda function version",
-            "Value": {
-              "Ref": "SwaggerSpecLambdaVersionnZpb9gvJTpjYZtTjxMaB5Gb75B4SXmwUy0wbY6KY"
-            },
-            "Export": {
-              "Name": "sls-appointment-api-dev-SwaggerSpecLambdaFunctionQualifiedArn"
-            }
-          },
           "SwaggerLambdaFunctionQualifiedArn": {
             "Description": "Current Lambda function version",
             "Value": {
-              "Ref": "SwaggerLambdaVersion7rASq7wp8Nonmk8pfP1OIP3Kg8Xj13abTm2NaXXIY"
+              "Ref": "SwaggerLambdaVersion9uJrVSm6VQ14MyklLCHyvbYkhCJXUqpqLTr5WQsGDg"
             },
             "Export": {
               "Name": "sls-appointment-api-dev-SwaggerLambdaFunctionQualifiedArn"
             }
           },
+          "SwaggerSpecLambdaFunctionQualifiedArn": {
+            "Description": "Current Lambda function version",
+            "Value": {
+              "Ref": "SwaggerSpecLambdaVersion7CynI7ivNMPA8lqhuT5G2JuS8OZxwAqhm1qTaDppE"
+            },
+            "Export": {
+              "Name": "sls-appointment-api-dev-SwaggerSpecLambdaFunctionQualifiedArn"
+            }
+          },
           "AppointmentHandlerLambdaFunctionQualifiedArn": {
             "Description": "Current Lambda function version",
             "Value": {
-              "Ref": "AppointmentHandlerLambdaVersionJZhFkguvEcSoDZKsLFNIoNXqPHYuqTgGA4qFK0Zt2Fc"
+              "Ref": "AppointmentHandlerLambdaVersionD7tFape2HTrR75GLIRHCCfgh85VceW1mZ9bnYFsI"
             },
             "Export": {
               "Name": "sls-appointment-api-dev-AppointmentHandlerLambdaFunctionQualifiedArn"
@@ -908,7 +948,7 @@
           {
             "sqs": {
               "arn": {
-                "$ref": "$[\"service\"][\"provider\"][\"compiledCloudFormationTemplate\"][\"Resources\"][\"IamRoleLambdaExecution\"][\"Properties\"][\"Policies\"][0][\"PolicyDocument\"][\"Statement\"][2][\"Resource\"][0]"
+                "$ref": "$[\"service\"][\"provider\"][\"compiledCloudFormationTemplate\"][\"Resources\"][\"IamRoleLambdaExecution\"][\"Properties\"][\"Policies\"][0][\"PolicyDocument\"][\"Statement\"][4][\"Resource\"][0]"
               }
             }
           }
@@ -924,7 +964,7 @@
         "timeout": 6,
         "runtime": "nodejs20.x",
         "vpc": {},
-        "versionLogicalId": "AppointmentHandlerLambdaVersionJZhFkguvEcSoDZKsLFNIoNXqPHYuqTgGA4qFK0Zt2Fc"
+        "versionLogicalId": "AppointmentHandlerLambdaVersionD7tFape2HTrR75GLIRHCCfgh85VceW1mZ9bnYFsI"
       },
       "swagger": {
         "handler": "src/handlers/swagger.ui",
@@ -957,7 +997,7 @@
         "timeout": 6,
         "runtime": "nodejs20.x",
         "vpc": {},
-        "versionLogicalId": "SwaggerLambdaVersion7rASq7wp8Nonmk8pfP1OIP3Kg8Xj13abTm2NaXXIY"
+        "versionLogicalId": "SwaggerLambdaVersion9uJrVSm6VQ14MyklLCHyvbYkhCJXUqpqLTr5WQsGDg"
       },
       "swaggerSpec": {
         "handler": "src/handlers/swagger.spec",
@@ -982,7 +1022,7 @@
         "timeout": 6,
         "runtime": "nodejs20.x",
         "vpc": {},
-        "versionLogicalId": "SwaggerSpecLambdaVersionnZpb9gvJTpjYZtTjxMaB5Gb75B4SXmwUy0wbY6KY"
+        "versionLogicalId": "SwaggerSpecLambdaVersion7CynI7ivNMPA8lqhuT5G2JuS8OZxwAqhm1qTaDppE"
       }
     },
     "resources": {
@@ -1192,7 +1232,7 @@
         ],
         "artifactsS3KeyDirname": "serverless/appointment-api/dev/code-artifacts",
         "deploymentBucket": "serverless-framework-deployments-us-east-2-91b3aea6-42e2",
-        "artifactDirectoryName": "serverless/appointment-api/dev/1755825371809-2025-08-22T01:16:11.809Z"
+        "artifactDirectoryName": "serverless/appointment-api/dev/1755833396181-2025-08-22T03:29:56.181Z"
       },
       "custom": {
         "$ref": "$[\"service\"][\"custom\"]"
@@ -1211,7 +1251,7 @@
   },
   "package": {
     "individually": true,
-    "artifactDirectoryName": "serverless/appointment-api/dev/1755825371809-2025-08-22T01:16:11.809Z",
+    "artifactDirectoryName": "serverless/appointment-api/dev/1755833396181-2025-08-22T03:29:56.181Z",
     "artifact": ""
   }
 }

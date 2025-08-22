@@ -18,7 +18,20 @@ provider:
     #RDS_USER: ${env:RDS_USER}
     #RDS_PASSWORD: ${env:RDS_PASSWORD}
     #RDS_DATABASE: ${env:RDS_DATABASE}
-
+  iam:
+    role:
+      statements:
+        - Effect: "Allow"
+          Action:
+            - events:PutEvents
+          Resource:
+            - Fn::Join:
+              - ''
+              - - 'arn:aws:events:'
+                - ${self:provider.region}
+                - ':'
+                - Ref: AWS::AccountId
+                - ':event-bus/${self:provider.environment.EVENT_BUS_NAME}'
 package:
   individually: true
 

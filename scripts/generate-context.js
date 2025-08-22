@@ -17,6 +17,7 @@ const EXCLUDED_DIRS = new Set([
   '.git', 
   'cdk.out', 
   '.idea',
+  '.serverless',
   'aws',      // Excluimos la carpeta de infraestructura de AWS
   'scripts',  // Excluimos la propia carpeta de scripts
 ]);
