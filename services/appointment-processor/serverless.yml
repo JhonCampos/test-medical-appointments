@@ -19,18 +19,8 @@ provider:
     #RDS_PASSWORD: ${env:RDS_PASSWORD}
     #RDS_DATABASE: ${env:RDS_DATABASE}
 
-plugins:
-  - serverless-esbuild
-
 package:
   individually: true
-
-custom:
-  esbuild:
-    bundle: true
-    minify: false
-    sourcemap: true
-    packager: pnpm
 
 functions:
   processPE:

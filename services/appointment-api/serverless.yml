@@ -22,6 +22,10 @@ plugins:
 
 package:
   individually: true
+  patterns:
+    - '!node_modules/**'
+    - 'node_modules/swagger-ui-dist/**' # Incluir los assets de Swagger UI
+    - 'openapi.yaml' # Incluir el archivo de especificación
 
 custom:
   tableName: appointments-table-${self:provider.stage}
@@ -32,26 +36,35 @@ custom:
       migrate: true
 
 functions:
-  createAppointment:
-    handler: src/handlers/createAppointment.handler
+  appointmentHandler:
+    handler: src/handlers/appointment.handler
     events:
       - httpApi:
           path: /appointments
           method: post
-  
-  listAppointments:
-    handler: src/handlers/listAppointments.handler
-    events:
       - httpApi:
           path: /appointments/{insuredId}
           method: get
-          
-  updateAppointmentStatus:
-    handler: src/handlers/updateAppointmentStatus.handler
-    events:
       - sqs:
           arn:
             Fn::GetAtt: [AppointmentsCompletionQueue, Arn]
+  
+  swagger:
+    handler: src/handlers/swagger.ui
+    events:
+      - httpApi:
+          path: /docs
+          method: get
+      - httpApi: # Ruta para los assets de Swagger UI
+          path: /docs/{proxy+}
+          method: get
+  
+  swaggerSpec:
+    handler: src/handlers/swagger.spec
+    events:
+      - httpApi:
+          path: /openapi.yaml
+          method: get
 
 resources:
   Resources:

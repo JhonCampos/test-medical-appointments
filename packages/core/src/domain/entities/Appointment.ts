@@ -1,13 +1,13 @@
-import { z } from 'zod';
+import { z } from 'zod/v4';
 
 export const AppointmentSchema = z.object({
-  appointmentId: z.string().uuid(),
+  appointmentId: z.string(),
   insuredId: z.string().length(5),
   scheduleId: z.number().int().positive(),
   countryISO: z.enum(['PE', 'CL']),
   status: z.enum(['PENDING', 'COMPLETED', 'FAILED']),
-  createdAt: z.string().datetime(),
-  updatedAt: z.string().datetime(),
+  createdAt: z.iso.datetime(),
+  updatedAt: z.iso.datetime(),
 });
 
 export type Appointment = z.infer<typeof AppointmentSchema>;

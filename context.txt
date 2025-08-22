@@ -22,9 +22,9 @@ module.exports = {
     "build": "tsc --build",
     "test": "jest",
     "test:watch": "jest --watch",
-    "deploy:api": "cd services/appointment-api && pnpm sls deploy --verbose",
-    "deploy:processor": "cd services/appointment-processor && pnpm sls deploy --verbose",
-    "offline:api": "cd services/appointment-api && pnpm sls offline start",
+    "deploy:api": "cd services/appointment-api && sls deploy --verbose",
+    "deploy:processor": "cd services/appointment-processor && sls deploy --verbose",
+    "offline:api": "cd services/appointment-api && sls offline start",
     "lint": "eslint . --ext .ts"
   },
   "devDependencies": {
@@ -1183,9 +1183,341 @@ packages:
 # test-medical-appointments
 
 
+// ===== Directory: services/appointment-api/.serverless =====
+
+// meta.json
+{
+  "/Users/jcampos/test-medical-appointments/services/appointment-api/serverless.yml": {
+    "versionFramework": "4.18.1",
+    "servicePath": "/Users/jcampos/test-medical-appointments/services/appointment-api/serverless.yml",
+    "serviceConfigFileName": "serverless.yml",
+    "service": {
+      "org": "aivoxia",
+      "service": "appointment-api",
+      "provider": {
+        "name": "aws",
+        "runtime": "nodejs20.x",
+        "region": "us-east-2",
+        "stage": "dev",
+        "tags": {
+          "app-id": "test-medical-appoinments",
+          "app-center-cost": "test-medical-appoinments",
+          "app-env": "test"
+        },
+        "environment": {
+          "DYNAMODB_TABLE_APPOINTMENTS": "appointments-table-dev",
+          "SNS_TOPIC_APPOINTMENTS_ARN": {
+            "Ref": "AppointmentsTopic"
+          }
+        },
+        "versionFunctions": true
+      },
+      "plugins": [
+        "serverless-esbuild",
+        "serverless-offline",
+        "serverless-dynamodb-local"
+      ],
+      "package": {
+        "individually": true
+      },
+      "custom": {
+        "tableName": "appointments-table-dev",
+        "esbuild": {
+          "bundle": true,
+          "minify": false,
+          "sourcemap": true,
+          "packager": "pnpm"
+        },
+        "dynamodb": {
+          "start": {
+            "port": 8000,
+            "inMemory": true,
+            "migrate": true
+          }
+        }
+      },
+      "functions": {
+        "createAppointment": {
+          "handler": "src/handlers/createAppointment.handler",
+          "events": [
+            {
+              "httpApi": {
+                "path": "/appointments",
+                "method": "post"
+              }
+            }
+          ]
+        },
+        "listAppointments": {
+          "handler": "src/handlers/listAppointments.handler",
+          "events": [
+            {
+              "httpApi": {
+                "path": "/appointments/{insuredId}",
+                "method": "get"
+              }
+            }
+          ]
+        },
+        "updateAppointmentStatus": {
+          "handler": "src/handlers/updateAppointmentStatus.handler",
+          "events": [
+            {
+              "sqs": {
+                "arn": {
+                  "Fn::GetAtt": [
+                    "AppointmentsCompletionQueue",
+                    "Arn"
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      },
+      "resources": {
+        "Resources": {
+          "AppointmentsTable": {
+            "Type": "AWS::DynamoDB::Table",
+            "Properties": {
+              "TableName": "appointments-table-dev",
+              "AttributeDefinitions": [
+                {
+                  "AttributeName": "insuredId",
+                  "AttributeType": "S"
+                },
+                {
+                  "AttributeName": "appointmentId",
+                  "AttributeType": "S"
+                }
+              ],
+              "KeySchema": [
+                {
+                  "AttributeName": "insuredId",
+                  "KeyType": "HASH"
+                },
+                {
+                  "AttributeName": "appointmentId",
+                  "KeyType": "RANGE"
+                }
+              ],
+              "BillingMode": "PAY_PER_REQUEST"
+            }
+          },
+          "AppointmentsTopic": {
+            "Type": "AWS::SNS::Topic",
+            "Properties": {
+              "TopicName": "appointments-topic-dev"
+            }
+          },
+          "AppointmentsQueuePE": {
+            "Type": "AWS::SQS::Queue",
+            "Properties": {
+              "QueueName": "appointments-queue-pe-dev"
+            }
+          },
+          "AppointmentsQueueCL": {
+            "Type": "AWS::SQS::Queue",
+            "Properties": {
+              "QueueName": "appointments-queue-cl-dev"
+            }
+          },
+          "SnsSubscriptionPE": {
+            "Type": "AWS::SNS::Subscription",
+            "Properties": {
+              "Protocol": "sqs",
+              "Endpoint": {
+                "Fn::GetAtt": [
+                  "AppointmentsQueuePE",
+                  "Arn"
+                ]
+              },
+              "TopicArn": {
+                "Ref": "AppointmentsTopic"
+              },
+              "FilterPolicy": {
+                "countryISO": [
+                  "PE"
+                ]
+              },
+              "RawMessageDelivery": "true"
+            }
+          },
+          "SnsSubscriptionCL": {
+            "Type": "AWS::SNS::Subscription",
+            "Properties": {
+              "Protocol": "sqs",
+              "Endpoint": {
+                "Fn::GetAtt": [
+                  "AppointmentsQueueCL",
+                  "Arn"
+                ]
+              },
+              "TopicArn": {
+                "Ref": "AppointmentsTopic"
+              },
+              "FilterPolicy": {
+                "countryISO": [
+                  "CL"
+                ]
+              },
+              "RawMessageDelivery": "true"
+            }
+          },
+          "SqsPolicy": {
+            "Type": "AWS::SQS::QueuePolicy",
+            "Properties": {
+              "Queues": [
+                {
+                  "Ref": "AppointmentsQueuePE"
+                },
+                {
+                  "Ref": "AppointmentsQueueCL"
+                }
+              ],
+              "PolicyDocument": {
+                "Statement": [
+                  {
+                    "Effect": "Allow",
+                    "Principal": {
+                      "Service": "sns.amazonaws.com"
+                    },
+                    "Action": "sqs:SendMessage",
+                    "Resource": "*",
+                    "Condition": {
+                      "ArnEquals": {
+                        "aws:SourceArn": {
+                          "Ref": "AppointmentsTopic"
+                        }
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          "AppointmentEventBus": {
+            "Type": "AWS::Events::EventBus",
+            "Properties": {
+              "Name": "appointment-event-bus-dev"
+            }
+          },
+          "AppointmentsCompletionQueue": {
+            "Type": "AWS::SQS::Queue",
+            "Properties": {
+              "QueueName": "appointments-completion-queue-dev"
+            }
+          },
+          "EventBusToSqsRule": {
+            "Type": "AWS::Events::Rule",
+            "Properties": {
+              "EventBusName": {
+                "Ref": "AppointmentEventBus"
+              },
+              "EventPattern": {
+                "source": [
+                  "appointment.processor"
+                ]
+              },
+              "Targets": [
+                {
+                  "Arn": {
+                    "Fn::GetAtt": [
+                      "AppointmentsCompletionQueue",
+                      "Arn"
+                    ]
+                  },
+                  "Id": "CompletionQueueTarget"
+                }
+              ]
+            }
+          },
+          "EventBridgeToSqsPolicy": {
+            "Type": "AWS::SQS::QueuePolicy",
+            "Properties": {
+              "Queues": [
+                {
+                  "Ref": "AppointmentsCompletionQueue"
+                }
+              ],
+              "PolicyDocument": {
+                "Statement": [
+                  {
+                    "Effect": "Allow",
+                    "Principal": {
+                      "Service": "events.amazonaws.com"
+                    },
+                    "Action": "sqs:SendMessage",
+                    "Resource": {
+                      "Fn::GetAtt": [
+                        "AppointmentsCompletionQueue",
+                        "Arn"
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "provider": {
+      "name": "aws",
+      "runtime": "nodejs20.x",
+      "region": "us-east-2",
+      "stage": "dev",
+      "tags": {
+        "app-id": "test-medical-appoinments",
+        "app-center-cost": "test-medical-appoinments",
+        "app-env": "test"
+      },
+      "environment": {
+        "DYNAMODB_TABLE_APPOINTMENTS": "appointments-table-dev",
+        "SNS_TOPIC_APPOINTMENTS_ARN": {
+          "Ref": "AppointmentsTopic"
+        }
+      },
+      "versionFunctions": true
+    },
+    "dashboard": {
+      "isEnabledForService": false,
+      "requiredAuthentication": false,
+      "orgFeaturesInUse": null,
+      "orgObservabilityIntegrations": null,
+      "serviceAppId": null,
+      "serviceProvider": null,
+      "instanceParameters": null
+    },
+    "error": {
+      "message": "Serverless now includes ESBuild and supports Typescript out-of-the-box. But this conflicts with the plugin 'serverless-esbuild'.\nYou can either remove this plugin and try Serverless's ESBuild support builtin, or you can set 'build.esbuild' to false in your 'serverless.yml'.\nFor more information go to, https://slss.io/buildoptions",
+      "stack": "ServerlessError2: Serverless now includes ESBuild and supports Typescript out-of-the-box. But this conflicts with the plugin 'serverless-esbuild'.\nYou can either remove this plugin and try Serverless's ESBuild support builtin, or you can set 'build.esbuild' to false in your 'serverless.yml'.\nFor more information go to, https://slss.io/buildoptions\n    at PluginManager.addPlugin (file:///Users/jcampos/.serverless/releases/4.18.1/package/dist/sf-core.js:1398:65)\n    at file:///Users/jcampos/.serverless/releases/4.18.1/package/dist/sf-core.js:1398:1734\n    at Array.forEach (<anonymous>)\n    at PluginManager.loadAllPlugins (file:///Users/jcampos/.serverless/releases/4.18.1/package/dist/sf-core.js:1398:1712)\n    at async Serverless.init (file:///Users/jcampos/.serverless/releases/4.18.1/package/dist/sf-core.js:1405:9843)\n    at async runFramework (file:///Users/jcampos/.serverless/releases/4.18.1/package/dist/sf-core.js:1432:839)\n    at async TraditionalRunner.run (file:///Users/jcampos/.serverless/releases/4.18.1/package/dist/sf-core.js:1428:28331)\n    at async route (file:///Users/jcampos/.serverless/releases/4.18.1/package/dist/sf-core.js:1603:2878)\n    at async Object.run (file:///Users/jcampos/.serverless/releases/4.18.1/package/dist/sf-core.js:1604:3661)\n    at async run2 (file:///Users/jcampos/.serverless/releases/4.18.1/package/dist/sf-core.js:1604:4815)",
+      "code": "PLUGIN_TYPESCRIPT_CONFLICT"
+    },
+    "serviceRawFile": "# \"org\" ensures this Service is used with the correct Serverless Framework Access Key.\norg: aivoxia\nservice: appointment-api\n\nprovider:\n  name: aws\n  runtime: nodejs20.x\n  region: ${opt:region, 'us-east-2'}\n  stage: ${opt:stage, 'dev'}\n  # Añadimos tags que se aplicarán a todos los recursos de la stack\n  tags:\n    app-id: test-medical-appoinments\n    app-center-cost: test-medical-appoinments\n    app-env: test\n  environment:\n    DYNAMODB_TABLE_APPOINTMENTS: ${self:custom.tableName}\n    SNS_TOPIC_APPOINTMENTS_ARN: { \"Ref\": \"AppointmentsTopic\" }\n\nplugins:\n  - serverless-esbuild\n  - serverless-offline\n  - serverless-dynamodb-local\n\npackage:\n  individually: true\n\ncustom:\n  tableName: appointments-table-${self:provider.stage}\n  esbuild:\n    bundle: true\n    minify: false\n    sourcemap: true\n    packager: pnpm\n  dynamodb:\n    start:\n      port: 8000\n      inMemory: true\n      migrate: true\n\nfunctions:\n  createAppointment:\n    handler: src/handlers/createAppointment.handler\n    events:\n      - httpApi:\n          path: /appointments\n          method: post\n  \n  listAppointments:\n    handler: src/handlers/listAppointments.handler\n    events:\n      - httpApi:\n          path: /appointments/{insuredId}\n          method: get\n          \n  updateAppointmentStatus:\n    handler: src/handlers/updateAppointmentStatus.handler\n    events:\n      - sqs:\n          arn:\n            Fn::GetAtt: [AppointmentsCompletionQueue, Arn]\n\nresources:\n  Resources:\n    AppointmentsTable:\n      Type: AWS::DynamoDB::Table\n      Properties:\n        TableName: ${self:custom.tableName}\n        AttributeDefinitions:\n          - AttributeName: insuredId\n            AttributeType: S\n          - AttributeName: appointmentId\n            AttributeType: S\n        KeySchema:\n          - AttributeName: insuredId\n            KeyType: HASH\n          - AttributeName: appointmentId\n            KeyType: RANGE\n        BillingMode: PAY_PER_REQUEST\n    \n    AppointmentsTopic:\n      Type: AWS::SNS::Topic\n      Properties:\n        TopicName: appointments-topic-${self:provider.stage}\n\n    AppointmentsQueuePE:\n      Type: AWS::SQS::Queue\n      Properties:\n        QueueName: appointments-queue-pe-${self:provider.stage}\n\n    AppointmentsQueueCL:\n      Type: AWS::SQS::Queue\n      Properties:\n        QueueName: appointments-queue-cl-${self:provider.stage}\n\n    SnsSubscriptionPE:\n      Type: AWS::SNS::Subscription\n      Properties:\n        Protocol: sqs\n        Endpoint: { \"Fn::GetAtt\": [\"AppointmentsQueuePE\", \"Arn\"] }\n        TopicArn: { \"Ref\": \"AppointmentsTopic\" }\n        FilterPolicy:\n          countryISO: [\"PE\"]\n        RawMessageDelivery: \"true\"\n\n    SnsSubscriptionCL:\n      Type: AWS::SNS::Subscription\n      Properties:\n        Protocol: sqs\n        Endpoint: { \"Fn::GetAtt\": [\"AppointmentsQueueCL\", \"Arn\"] }\n        TopicArn: { \"Ref\": \"AppointmentsTopic\" }\n        FilterPolicy:\n          countryISO: [\"CL\"]\n        RawMessageDelivery: \"true\"\n\n    SqsPolicy:\n      Type: AWS::SQS::QueuePolicy\n      Properties:\n        Queues:\n          - { \"Ref\": \"AppointmentsQueuePE\" }\n          - { \"Ref\": \"AppointmentsQueueCL\" }\n        PolicyDocument:\n          Statement:\n            - Effect: \"Allow\"\n              Principal:\n                Service: \"sns.amazonaws.com\"\n              Action: \"sqs:SendMessage\"\n              Resource: \"*\"\n              Condition:\n                ArnEquals:\n                  aws:SourceArn: { \"Ref\": \"AppointmentsTopic\" }\n    \n    AppointmentEventBus:\n      Type: AWS::Events::EventBus\n      Properties:\n        Name: appointment-event-bus-${self:provider.stage}\n        \n    AppointmentsCompletionQueue:\n      Type: AWS::SQS::Queue\n      Properties:\n        QueueName: appointments-completion-queue-${self:provider.stage}\n        \n    EventBusToSqsRule:\n      Type: AWS::Events::Rule\n      Properties:\n        EventBusName: { \"Ref\": \"AppointmentEventBus\" }\n        EventPattern:\n          source:\n            - \"appointment.processor\"\n        Targets:\n          - Arn: { \"Fn::GetAtt\": [\"AppointmentsCompletionQueue\", \"Arn\"] }\n            Id: \"CompletionQueueTarget\"\n            \n    EventBridgeToSqsPolicy:\n      Type: AWS::SQS::QueuePolicy\n      Properties:\n        Queues:\n          - Ref: AppointmentsCompletionQueue\n        PolicyDocument:\n          Statement:\n            - Effect: Allow\n              Principal:\n                Service: events.amazonaws.com\n              Action: sqs:SendMessage\n              Resource: { \"Fn::GetAtt\": [\"AppointmentsCompletionQueue\", \"Arn\"] }",
+    "command": [
+      "offline",
+      "start"
+    ],
+    "options": {},
+    "orgId": "1380abf4-7a7b-44ab-b514-b102c1c96e9c",
+    "orgName": "aivoxia",
+    "userId": "2tcSJYLFgJ4JsHK4SY",
+    "userName": "aivoxia",
+    "serviceProviderAwsAccountId": "941958612220",
+    "serviceProviderAwsCfStackId": null,
+    "serviceProviderAwsCfStackCreated": null,
+    "serviceProviderAwsCfStackUpdated": null,
+    "serviceProviderAwsCfStackStatus": null,
+    "serviceProviderAwsCfStackOutputs": null
+  }
+}
+
 // ===== Directory: services/appointment-api =====
 
 // serverless.yml
+# "org" ensures this Service is used with the correct Serverless Framework Access Key.
+org: aivoxia
 service: appointment-api
 
 provider:
@@ -1203,7 +1535,6 @@ provider:
     SNS_TOPIC_APPOINTMENTS_ARN: { "Ref": "AppointmentsTopic" }
 
 plugins:
-  - serverless-esbuild
   - serverless-offline
   - serverless-dynamodb-local
 
@@ -1212,11 +1543,6 @@ package:
 
 custom:
   tableName: appointments-table-${self:provider.stage}
-  esbuild:
-    bundle: true
-    minify: false
-    sourcemap: true
-    packager: pnpm
   dynamodb:
     start:
       port: 8000
@@ -1349,7 +1675,7 @@ resources:
               Action: sqs:SendMessage
               Resource: { "Fn::GetAtt": ["AppointmentsCompletionQueue", "Arn"] }
 
-// ===== Directory: services/appointment-api/src =====
+// ===== Directory: services/appointment-api/src/handlers =====
 
 // createAppointment.ts
 import { CreateAppointmentSchema } from '@core/application/dtos/AppointmentDtos';
@@ -1379,20 +1705,22 @@ import { ListAppointmentsRequestSchema } from '@core/application/dtos/Appointmen
 import { lambdaHandlerWrapper } from '@infrastructure/common/LambdaHandlerWrapper';
 import { container } from '@infrastructure/di/container';
 import { ListAppointmentsUseCase } from '@core/application/use-cases/ListAppointments';
+import { validateAndParse } from '@core/common/utils/validation'; // [!code ++]
 
 /**
  * @description Manejador de Lambda para listar citas por insuredId.
  */
 async function listAppointmentsHandler(event: any) {
-  // Extraer parámetros de la ruta y validarlos
-  const { insuredId } = ListAppointmentsRequestSchema.parse(event.pathParameters);
+  // Extraer parámetros de la ruta y validarlos con nuestra función estandarizada
+  const { insuredId } = validateAndParse(ListAppointmentsRequestSchema, event.pathParameters); // [!code ++]
+  // const { insuredId } = ListAppointmentsRequestSchema.parse(event.pathParameters); // [!code --]
 
   // Resolver la dependencia del caso de uso
   const useCase = container.resolve<ListAppointmentsUseCase>('listAppointmentsUseCase');
   
   // Ejecutar el caso de uso
   const result = await useCase.execute(insuredId);
-
+  
   // Retornar la respuesta exitosa
   return {
     statusCode: 200,
@@ -1404,29 +1732,28 @@ export const handler = lambdaHandlerWrapper(listAppointmentsHandler);// updateAp
 import { UpdateAppointmentStatusEventSchema } from '@core/application/dtos/AppointmentDtos';
 import { UpdateAppointmentStatusUseCase } from '@core/application/use-cases/UpdateAppointmentStatus';
 import { container } from '@infrastructure/di/container';
+import { validateAndParse } from '@core/common/utils/validation'; // [!code ++]
 
 export const handler = async (event: any): Promise<void> => {
   console.log('Received SQS event for status update:', JSON.stringify(event, null, 2));
-
   const useCase = container.resolve<UpdateAppointmentStatusUseCase>('updateAppointmentStatusUseCase');
 
   for (const record of event.Records) {
     try {
       const body = JSON.parse(record.body);
-      
       // El cuerpo del mensaje de SQS contiene el evento completo de EventBridge.
       // El payload que nos interesa está en la propiedad 'detail'.
       const eventDetail = body.detail;
-
-      // 1. Validar el detalle del evento
-      const validatedEvent = UpdateAppointmentStatusEventSchema.parse(eventDetail);
+      
+      // 1. Validar el detalle del evento usando nuestra función estandarizada
+      const validatedEvent = validateAndParse(UpdateAppointmentStatusEventSchema, eventDetail); // [!code ++]
+      // const validatedEvent = UpdateAppointmentStatusEventSchema.parse(eventDetail); // [!code --]
 
       // 2. Ejecutar el caso de uso con los datos validados
       await useCase.execute({
         appointmentId: validatedEvent.appointmentId,
         insuredId: validatedEvent.insuredId,
       });
-
     } catch (error) {
       console.error('Failed to process status update record:', record.body, error);
       // Lanzar el error para que SQS pueda gestionar los reintentos
@@ -1445,6 +1772,7 @@ provider:
   runtime: nodejs20.x
   region: ${opt:region, 'us-east-2'}
   stage: ${opt:stage, 'dev'}
+  profile: ${opt:profile, 'aivoxia'}
   # Añadimos tags que se aplicarán a todos los recursos de la stack
   tags:
     app-id: test-medical-appoinments

@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from 'zod/v4';
 import { AppointmentSchema } from '../../domain/entities/Appointment';
 
 export const CreateAppointmentSchema = z.object({
@@ -17,7 +17,7 @@ export const AppointmentResponseSchema = AppointmentSchema;
 export type AppointmentResponseDto = z.infer<typeof AppointmentResponseSchema>;
 
 export const SnsAppointmentEventSchema = z.object({
-  appointmentId: z.string().uuid(),
+  appointmentId: z.string(),
   insuredId: z.string(),
   scheduleId: z.number(),
   countryISO: z.enum(['PE', 'CL']),
@@ -26,7 +26,7 @@ export const SnsAppointmentEventSchema = z.object({
 export type SnsAppointmentEventDto = z.infer<typeof SnsAppointmentEventSchema>;
 
 export const UpdateAppointmentStatusEventSchema = z.object({
-  appointmentId: z.string().uuid(),
+  appointmentId: z.string(),
   insuredId: z.string(),
   status: z.literal('PROCESSED'),
 });

@@ -1,0 +1,59 @@
+# api.http
+# Archivo para probar los endpoints del servicio appointment-api.
+# Requiere la extensión "REST Client" en Visual Studio Code.
+
+# --- Variables ---
+# Define la URL base del servicio local iniciado con `sls offline`.
+@host = http://localhost:3000
+
+###
+# ==============================================================================
+# 1. Crear una nueva cita (POST /appointments)
+# ==============================================================================
+# Esta petición envía un payload para crear una cita médica para Perú.
+# Haz clic en "Send Request" arriba de POST para ejecutarla.
+POST {{host}}/appointments
+Content-Type: application/json
+
+{
+  "insuredId": "12345",
+  "scheduleId": 101,
+  "countryISO": "PE"
+}
+
+###
+# Ejemplo para crear una cita para Chile.
+POST {{host}}/appointments
+Content-Type: application/json
+
+{
+  "insuredId": "54321",
+  "scheduleId": 202,
+  "countryISO": "CL"
+}
+
+###
+# Ejemplo de petición con datos inválidos (el insuredId no tiene 5 dígitos).
+# Debería devolver un error 400 (Bad Request).
+POST {{host}}/appointments
+Content-Type: application/json
+
+{
+  "insuredId": "123",
+  "scheduleId": 303,
+  "countryISO": "PE"
+}
+
+
+###
+# ==============================================================================
+# 2. Listar citas por ID de asegurado (GET /appointments/{insuredId})
+# ==============================================================================
+# Reemplaza '12345' con el ID del asegurado que deseas consultar.
+# Primero debes haber creado al menos una cita para este ID.
+GET {{host}}/appointments/12345
+
+###
+# Ejemplo para consultar el otro asegurado.
+GET {{host}}/appointments/54321
+

@@ -1,0 +1,171 @@
+openapi: 3.1.0
+info:
+  title: API de Agendamiento de Citas Médicas
+  version: 1.0.0
+  description: API para gestionar la creación y consulta de citas médicas.
+servers:
+  - url: /dev
+paths:
+  /appointments:
+    post:
+      summary: Crear una nueva cita médica
+      description: Registra una nueva cita y la envía para procesamiento asíncrono.
+      tags:
+        - Appointments
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAppointmentRequest"
+      responses:
+        "202":
+          description: Cita aceptada para procesamiento.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AppointmentResponse"
+        "400":
+          description: Datos de la solicitud inválidos.
+  /appointments/{insuredId}:
+    get:
+      summary: Listar citas por asegurado
+      description: Obtiene todas las citas médicas registradas para un ID de asegurado
+        específico.
+      tags:
+        - Appointments
+      parameters:
+        - name: insuredId
+          in: path
+          required: true
+          schema: &a1
+            type: string
+            pattern: ^[0-9]{5}$
+      responses:
+        "200":
+          description: Lista de citas obtenida exitosamente.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AppointmentsListResponse"
+        "400":
+          description: El ID del asegurado es inválido.
+        "404":
+          description: Asegurado no encontrado o sin citas.
+components:
+  schemas:
+    CreateAppointmentRequest:
+      $schema: https://json-schema.org/draft/2020-12/schema
+      type: object
+      properties:
+        insuredId:
+          type: string
+          pattern: ^[0-9]{5}$
+        scheduleId:
+          type: integer
+          exclusiveMinimum: 0
+          maximum: 9007199254740991
+        countryISO:
+          type: string
+          enum:
+            - PE
+            - CL
+      required:
+        - insuredId
+        - scheduleId
+        - countryISO
+      additionalProperties: false
+    ListAppointmentsParams:
+      $schema: https://json-schema.org/draft/2020-12/schema
+      type: object
+      properties:
+        insuredId: *a1
+      required:
+        - insuredId
+      additionalProperties: false
+    AppointmentResponse:
+      $schema: https://json-schema.org/draft/2020-12/schema
+      type: object
+      properties:
+        appointmentId:
+          type: string
+        insuredId:
+          type: string
+          minLength: 5
+          maxLength: 5
+        scheduleId:
+          type: integer
+          exclusiveMinimum: 0
+          maximum: 9007199254740991
+        countryISO:
+          type: string
+          enum:
+            - PE
+            - CL
+        status:
+          type: string
+          enum:
+            - PENDING
+            - COMPLETED
+            - FAILED
+        createdAt:
+          type: string
+          format: date-time
+          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?(?:Z))$
+        updatedAt:
+          type: string
+          format: date-time
+          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?(?:Z))$
+      required:
+        - appointmentId
+        - insuredId
+        - scheduleId
+        - countryISO
+        - status
+        - createdAt
+        - updatedAt
+      additionalProperties: false
+    AppointmentsListResponse:
+      $schema: https://json-schema.org/draft/2020-12/schema
+      type: array
+      items:
+        type: object
+        properties:
+          appointmentId:
+            type: string
+          insuredId:
+            type: string
+            minLength: 5
+            maxLength: 5
+          scheduleId:
+            type: integer
+            exclusiveMinimum: 0
+            maximum: 9007199254740991
+          countryISO:
+            type: string
+            enum:
+              - PE
+              - CL
+          status:
+            type: string
+            enum:
+              - PENDING
+              - COMPLETED
+              - FAILED
+          createdAt:
+            type: string
+            format: date-time
+            pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?(?:Z))$
+          updatedAt:
+            type: string
+            format: date-time
+            pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?(?:Z))$
+        required:
+          - appointmentId
+          - insuredId
+          - scheduleId
+          - countryISO
+          - status
+          - createdAt
+          - updatedAt
+        additionalProperties: false
