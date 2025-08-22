@@ -1,14 +1,5 @@
-import { z } from 'zod/v4';
-
-export const AppointmentSchema = z.object({
-  appointmentId: z.string(),
-  insuredId: z.string().length(5),
-  scheduleId: z.number().int().positive(),
-  countryISO: z.enum(['PE', 'CL']),
-  status: z.enum(['PENDING', 'COMPLETED', 'FAILED']),
-  createdAt: z.iso.datetime(),
-  updatedAt: z.iso.datetime(),
-});
+import { AppointmentSchema } from "@core/application/dtos/AppointmentDtos";
+import { z } from "zod/v4";
 
 export type Appointment = z.infer<typeof AppointmentSchema>;
 
@@ -16,22 +7,25 @@ export class AppointmentEntity {
   private props: Appointment;
 
   constructor(props: Appointment) {
-    this.props = { ...props };
+    // Validamos los props al construir la entidad
+    this.props = AppointmentSchema.parse(props);
   }
 
   static create(props: Omit<Appointment, 'appointmentId' | 'status' | 'createdAt' | 'updatedAt'>): AppointmentEntity {
     const now = new Date().toISOString();
-    return new AppointmentEntity({
+    const appointmentData: Appointment = {
       ...props,
       appointmentId: crypto.randomUUID(),
       status: 'PENDING',
       createdAt: now,
       updatedAt: now,
-    });
+    };
+    
+    return new AppointmentEntity(appointmentData);
   }
 
   get values(): Appointment {
-    return this.props;
+    return { ...this.props };
   }
 
   complete(): void {

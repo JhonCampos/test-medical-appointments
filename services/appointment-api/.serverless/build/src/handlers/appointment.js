@@ -19055,20 +19055,21 @@ var AppointmentSchema = external_exports.object({
 var AppointmentEntity = class _AppointmentEntity {
   props;
   constructor(props) {
-    this.props = { ...props };
+    this.props = AppointmentSchema.parse(props);
   }
   static create(props) {
     const now = (/* @__PURE__ */ new Date()).toISOString();
-    return new _AppointmentEntity({
+    const appointmentData = {
       ...props,
       appointmentId: crypto.randomUUID(),
       status: "PENDING",
       createdAt: now,
       updatedAt: now
-    });
+    };
+    return new _AppointmentEntity(appointmentData);
   }
   get values() {
-    return this.props;
+    return { ...this.props };
   }
   complete() {
     if (this.props.status !== "PENDING") {
@@ -19445,12 +19446,25 @@ var lambdaHandlerWrapper = (handler2) => async (event, context) => {
   try {
     console.log("Request Event:", JSON.stringify(event, null, 2));
     const result = await handler2(event, context);
-    return {
-      statusCode: result.statusCode || 200,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(result.body)
-    };
+    if (result === void 0 || result === null) {
+      return;
+    }
+    if (typeof result === "object" && result.statusCode && "body" in result) {
+      return result;
+    }
+    if (event.requestContext) {
+      return {
+        statusCode: result.statusCode || 200,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(result.body !== void 0 ? result.body : result)
+      };
+    }
+    return result;
   } catch (error43) {
+    if (event.Records && Array.isArray(event.Records)) {
+      console.error("SQS Handler Error:", error43);
+      throw error43;
+    }
     return handleError(error43);
   }
 };
@@ -19468,6 +19482,15 @@ function validateAndParse(schema, data) {
 }
 
 // ../../packages/core/src/application/dtos/AppointmentDtos.ts
+var AppointmentSchema2 = external_exports.object({
+  appointmentId: external_exports.string(),
+  insuredId: external_exports.string().length(5),
+  scheduleId: external_exports.number().int().positive(),
+  countryISO: external_exports.enum(["PE", "CL"]),
+  status: external_exports.enum(["PENDING", "COMPLETED", "FAILED"]),
+  createdAt: external_exports.iso.datetime(),
+  updatedAt: external_exports.iso.datetime()
+});
 var CreateAppointmentSchema = external_exports.object({
   insuredId: external_exports.string().regex(/^[0-9]{5}$/, "El insuredId debe ser de 5 d\xEDgitos num\xE9ricos."),
   scheduleId: external_exports.number().int().positive(),
@@ -19481,7 +19504,7 @@ var SnsAppointmentEventSchema = external_exports.object({
   insuredId: external_exports.string(),
   scheduleId: external_exports.number(),
   countryISO: external_exports.enum(["PE", "CL"]),
-  createdAt: external_exports.string().datetime()
+  createdAt: external_exports.iso.datetime()
 });
 var UpdateAppointmentStatusEventSchema = external_exports.object({
   appointmentId: external_exports.string(),
@@ -19491,7 +19514,7 @@ var UpdateAppointmentStatusEventSchema = external_exports.object({
 
 // src/handlers/appointment.ts
 async function appointmentRouter(event) {
-  if (event.requestContext && event.requestContext.http) {
+  if (event.requestContext?.http) {
     const httpMethod = event.requestContext.http.method;
     if (httpMethod === "POST") {
       const body = JSON.parse(event.body);
@@ -19500,12 +19523,11 @@ async function appointmentRouter(event) {
       const result = await useCase.execute(dto);
       return {
         statusCode: 202,
-        // Accepted
         body: result
       };
     }
     if (httpMethod === "GET") {
-      const { insuredId } = validateAndParse(ListAppointmentsRequestSchema, event.pathParameters);
+      const { insuredId } = validateAndParse(ListAppointmentsRequestSchema, event.pathParameters || {});
       const useCase = container.resolve("listAppointmentsUseCase");
       const result = await useCase.execute(insuredId);
       return {
@@ -19513,28 +19535,23 @@ async function appointmentRouter(event) {
         body: result
       };
     }
+    throw new Error(`M\xE9todo HTTP no soportado: ${httpMethod}`);
   }
-  if (event.Records && event.Records[0].eventSource === "aws:sqs") {
-    console.log("Received SQS event for status update:", JSON.stringify(event, null, 2));
+  if (event.Records && Array.isArray(event.Records)) {
+    console.log("Processing SQS event for status update");
     const useCase = container.resolve("updateAppointmentStatusUseCase");
     for (const record2 of event.Records) {
-      try {
-        const body = JSON.parse(record2.body);
-        const eventDetail = body.detail;
-        const validatedEvent = validateAndParse(UpdateAppointmentStatusEventSchema, eventDetail);
-        await useCase.execute({
-          appointmentId: validatedEvent.appointmentId,
-          insuredId: validatedEvent.insuredId
-        });
-      } catch (error43) {
-        console.error("Failed to process status update record:", record2.body, error43);
-        throw error43;
-      }
+      const body = JSON.parse(record2.body);
+      const eventDetail = body.detail;
+      const validatedEvent = validateAndParse(UpdateAppointmentStatusEventSchema, eventDetail);
+      await useCase.execute({
+        appointmentId: validatedEvent.appointmentId,
+        insuredId: validatedEvent.insuredId
+      });
     }
     return;
   }
-  console.error("Evento no reconocido o no soportado:", JSON.stringify(event, null, 2));
-  throw new Error("Tipo de evento no soportado por este handler.");
+  throw new Error("Tipo de evento no soportado");
 }
 var handler = lambdaHandlerWrapper(appointmentRouter);
 // Annotate the CommonJS export names for ESM import in node:

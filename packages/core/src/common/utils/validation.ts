@@ -1,8 +1,8 @@
-import { z, ZodError } from 'zod';
-import {BadRequestError} from '../errors/AppError';
+import { z, ZodError } from 'zod/v4';
+import { BadRequestError } from '../errors/AppError';
 
 /**
- * Valida y parsea un objeto de datos usando un esquema de Zod.
+ * Valida y parsea un objeto de datos usando un esquema de Zod v4.
  * Si la validación falla, lanza un AppError estandarizado con los detalles.
  *
  * @template T El tipo inferido del esquema.

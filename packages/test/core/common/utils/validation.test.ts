@@ -1,4 +1,4 @@
-import { z, ZodError } from 'zod';
+import { z, ZodError } from 'zod/v4';
 import { validateAndParse } from '@core/common/utils/validation';
 import { AppError, ErrorCode, HttpStatusCode } from '@core/common/errors/AppError';
 
