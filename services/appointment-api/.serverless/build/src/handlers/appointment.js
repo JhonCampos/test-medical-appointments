@@ -19072,6 +19072,12 @@ var UpdateAppointmentStatusEventSchema = external_exports.object({
   insuredId: external_exports.string(),
   status: external_exports.literal("PROCESSED")
 });
+var GetAppointmentRequestSchema = external_exports.object({
+  insuredId: external_exports.string().regex(/^[0-9]{5}$/, "El insuredId debe ser de 5 d\xEDgitos num\xE9ricos."),
+  // [!code ++]
+  appointmentId: external_exports.string().uuid("El appointmentId debe ser un UUID v\xE1lido.")
+  // [!code ++]
+});
 
 // ../../packages/core/src/domain/entities/Appointment.ts
 var AppointmentEntity = class _AppointmentEntity {
@@ -19165,6 +19171,11 @@ var BadRequestError = class extends AppError {
     );
   }
 };
+var NotFoundError = class extends AppError {
+  constructor(message = "Recurso no encontrado") {
+    super(message, "NOT_FOUND" /* NotFound */, 404 /* NOT_FOUND */);
+  }
+};
 
 // ../../packages/core/src/application/use-cases/UpdateAppointmentStatus.ts
 var UpdateAppointmentStatusUseCase = class {
@@ -19189,6 +19200,32 @@ var UpdateAppointmentStatusUseCase = class {
     appointmentEntity.complete();
     await this.appointmentRepository.update(appointmentEntity.values);
     console.log(`Appointment ${appointmentId} status updated to COMPLETED.`);
+  }
+};
+
+// ../../packages/core/src/application/use-cases/GetAppointment.ts
+var GetAppointmentUseCase = class {
+  /**
+   * @param appointmentRepository El repositorio para acceder a los datos de las citas.
+   */
+  constructor(appointmentRepository) {
+    this.appointmentRepository = appointmentRepository;
+  }
+  /**
+   * Ejecuta el caso de uso.
+   * @param dto El DTO con los identificadores de la cita.
+   * @returns Una promesa que se resuelve con los datos de la cita.
+   * @throws {NotFoundError} Si la cita no se encuentra.
+   */
+  async execute(dto) {
+    const appointment = await this.appointmentRepository.findById({
+      insuredId: dto.insuredId,
+      appointmentId: dto.appointmentId
+    });
+    if (!appointment) {
+      throw new NotFoundError(`No se encontr\xF3 la cita con ID ${dto.appointmentId}.`);
+    }
+    return appointment;
   }
 };
 
@@ -19413,6 +19450,8 @@ container.register({
   // Casos de Uso
   createAppointmentUseCase: (0, import_awilix.asClass)(CreateAppointmentUseCase).singleton(),
   listAppointmentsUseCase: (0, import_awilix.asClass)(ListAppointmentsUseCase).singleton(),
+  getAppointmentUseCase: (0, import_awilix.asClass)(GetAppointmentUseCase).singleton(),
+  // [!code ++]
   updateAppointmentStatusUseCase: (0, import_awilix.asClass)(UpdateAppointmentStatusUseCase).singleton(),
   // Registramos los nuevos casos de uso específicos y eliminamos el genérico
   processAppointmentPEUseCase: (0, import_awilix.asClass)(ProcessAppointmentPEUseCase).singleton(),
@@ -19511,47 +19550,65 @@ function validateAndParse(schema, data) {
 }
 
 // src/handlers/appointment.ts
-async function appointmentRouter(event) {
+async function createAppointmentHandler(event) {
+  const body = JSON.parse(event.body);
+  const dto = validateAndParse(CreateAppointmentSchema, body);
+  const useCase = container.resolve("createAppointmentUseCase");
+  const result = await useCase.execute(dto);
+  return { statusCode: 202, body: result };
+}
+async function getAppointmentHandler(event) {
+  const dto = validateAndParse(GetAppointmentRequestSchema, event.pathParameters || {});
+  const useCase = container.resolve("getAppointmentUseCase");
+  const result = await useCase.execute(dto);
+  return { statusCode: 200, body: result };
+}
+async function listAppointmentsHandler(event) {
+  const { insuredId } = validateAndParse(ListAppointmentsRequestSchema, event.pathParameters || {});
+  const useCase = container.resolve("listAppointmentsUseCase");
+  const result = await useCase.execute(insuredId);
+  return { statusCode: 200, body: result };
+}
+async function handleHttpRequest(event) {
+  const method = event.requestContext.http.method;
+  const pathParameters = event.pathParameters || {};
+  if (method === "POST") {
+    return createAppointmentHandler(event);
+  }
+  if (method === "GET") {
+    if (pathParameters.appointmentId) {
+      return getAppointmentHandler(event);
+    }
+    if (pathParameters.insuredId) {
+      return listAppointmentsHandler(event);
+    }
+  }
+  throw new AppError(`Ruta no encontrada: ${method} ${event.rawPath}`, "NOT_FOUND" /* NotFound */, 404 /* NOT_FOUND */);
+}
+async function handleSqsRequest(event) {
+  console.log("Processing SQS event for status update");
+  const useCase = container.resolve("updateAppointmentStatusUseCase");
+  for (const record2 of event.Records) {
+    const body = JSON.parse(record2.body);
+    const eventDetail = body.detail;
+    const validatedEvent = validateAndParse(UpdateAppointmentStatusEventSchema, eventDetail);
+    await useCase.execute({
+      appointmentId: validatedEvent.appointmentId,
+      insuredId: validatedEvent.insuredId
+    });
+  }
+}
+async function mainHandler(event) {
   if (event.requestContext?.http) {
-    const httpMethod = event.requestContext.http.method;
-    if (httpMethod === "POST") {
-      const body = JSON.parse(event.body);
-      const dto = validateAndParse(CreateAppointmentSchema, body);
-      const useCase = container.resolve("createAppointmentUseCase");
-      const result = await useCase.execute(dto);
-      return {
-        statusCode: 202,
-        body: result
-      };
-    }
-    if (httpMethod === "GET") {
-      const { insuredId } = validateAndParse(ListAppointmentsRequestSchema, event.pathParameters || {});
-      const useCase = container.resolve("listAppointmentsUseCase");
-      const result = await useCase.execute(insuredId);
-      return {
-        statusCode: 200,
-        body: result
-      };
-    }
-    throw new Error(`M\xE9todo HTTP no soportado: ${httpMethod}`);
+    return handleHttpRequest(event);
   }
   if (event.Records && Array.isArray(event.Records)) {
-    console.log("Processing SQS event for status update");
-    const useCase = container.resolve("updateAppointmentStatusUseCase");
-    for (const record2 of event.Records) {
-      const body = JSON.parse(record2.body);
-      const eventDetail = body.detail;
-      const validatedEvent = validateAndParse(UpdateAppointmentStatusEventSchema, eventDetail);
-      await useCase.execute({
-        appointmentId: validatedEvent.appointmentId,
-        insuredId: validatedEvent.insuredId
-      });
-    }
+    await handleSqsRequest(event);
     return;
   }
-  throw new Error("Tipo de evento no soportado");
+  throw new AppError("Tipo de evento no soportado", "BAD_REQUEST" /* BadRequest */, 400 /* BAD_REQUEST */);
 }
-var handler = lambdaHandlerWrapper(appointmentRouter);
+var handler = lambdaHandlerWrapper(mainHandler);
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   handler

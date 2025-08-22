@@ -34,9 +34,9 @@ CREATE_RESPONSE=$(curl -s -X POST \
 echo "Respuesta de creación:"
 echo $CREATE_RESPONSE
 
-# Extraer datos de la respuesta para usarlos después
-APPOINTMENT_ID=$(echo $CREATE_RESPONSE | jq -r '.appointmentId')
-INSURED_ID=$(echo $CREATE_RESPONSE | jq -r '.insuredId')
+# Extraer datos de la respuesta usando grep y cut (sin jq)
+APPOINTMENT_ID=$(echo $CREATE_RESPONSE | grep -o '"appointmentId":"[^"]*' | cut -d'"' -f4)
+INSURED_ID=$(echo $CREATE_RESPONSE | grep -o '"insuredId":"[^"]*' | cut -d'"' -f4)
 
 
 # --- PRUEBA 2: Crear una cita para Chile (CL) ---

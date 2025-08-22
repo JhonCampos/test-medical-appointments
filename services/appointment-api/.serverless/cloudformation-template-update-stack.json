@@ -147,7 +147,7 @@
       "Properties": {
         "Code": {
           "S3Bucket": "serverless-framework-deployments-us-east-2-91b3aea6-42e2",
-          "S3Key": "serverless/appointment-api/dev/1755836375086-2025-08-22T04:19:35.086Z/appointment-api-appointmentHandler.zip"
+          "S3Key": "serverless/appointment-api/dev/1755839446328-2025-08-22T05:10:46.328Z/appointment-api-appointmentHandler.zip"
         },
         "Handler": "src/handlers/appointment.handler",
         "Runtime": "nodejs20.x",
@@ -193,7 +193,7 @@
       "Properties": {
         "Code": {
           "S3Bucket": "serverless-framework-deployments-us-east-2-91b3aea6-42e2",
-          "S3Key": "serverless/appointment-api/dev/1755836375086-2025-08-22T04:19:35.086Z/appointment-api-swagger.zip"
+          "S3Key": "serverless/appointment-api/dev/1755839446328-2025-08-22T05:10:46.328Z/appointment-api-swagger.zip"
         },
         "Handler": "src/handlers/swagger.ui",
         "Runtime": "nodejs20.x",
@@ -239,7 +239,7 @@
       "Properties": {
         "Code": {
           "S3Bucket": "serverless-framework-deployments-us-east-2-91b3aea6-42e2",
-          "S3Key": "serverless/appointment-api/dev/1755836375086-2025-08-22T04:19:35.086Z/appointment-api-swaggerSpec.zip"
+          "S3Key": "serverless/appointment-api/dev/1755839446328-2025-08-22T05:10:46.328Z/appointment-api-swaggerSpec.zip"
         },
         "Handler": "src/handlers/swagger.spec",
         "Runtime": "nodejs20.x",
@@ -280,34 +280,34 @@
         "SwaggerSpecLogGroup"
       ]
     },
-    "SwaggerSpecLambdaVersionAKV387ywqNaAPvLqcXCCP6bywRKV2OnSmcRPi2nq9c": {
+    "SwaggerSpecLambdaVersionm0zEyauaaU2xxrbHPVCNcZYgbC7D28DAxAp6t2ESGk": {
       "Type": "AWS::Lambda::Version",
       "DeletionPolicy": "Retain",
       "Properties": {
         "FunctionName": {
           "Ref": "SwaggerSpecLambdaFunction"
         },
-        "CodeSha256": "G2mO0LNX9DMsa2+avMSWUCqZI1R1gLdEL7bnWEJjC0Q="
+        "CodeSha256": "G5CwWQy+oC+C1yuVuarRcSGeNzNfHhNnoxrOgKoUXhA="
       }
     },
-    "SwaggerLambdaVersionX4ZFjMBdeiHLPGii89OROh23QM8bjJECftYLrNGhJU": {
+    "SwaggerLambdaVersion998lA8qmaeILuSUX5F7DdaYVIo85FE5l3nzNqMBM": {
       "Type": "AWS::Lambda::Version",
       "DeletionPolicy": "Retain",
       "Properties": {
         "FunctionName": {
           "Ref": "SwaggerLambdaFunction"
         },
-        "CodeSha256": "G2mO0LNX9DMsa2+avMSWUCqZI1R1gLdEL7bnWEJjC0Q="
+        "CodeSha256": "G5CwWQy+oC+C1yuVuarRcSGeNzNfHhNnoxrOgKoUXhA="
       }
     },
-    "AppointmentHandlerLambdaVersionTH8jwwaaPerW4apbHCnWraz0ZtyKHBGAMShT235QQQ": {
+    "AppointmentHandlerLambdaVersionNbGgbBwxOoAhX3927vkfHEaqLm6g4pfAY5khGSSznM": {
       "Type": "AWS::Lambda::Version",
       "DeletionPolicy": "Retain",
       "Properties": {
         "FunctionName": {
           "Ref": "AppointmentHandlerLambdaFunction"
         },
-        "CodeSha256": "v2iumS+oeo7Ds+8Zx3TQUQEMH3nxs5wyQ6V4f34iRVs="
+        "CodeSha256": "KgyhToieR+9mg0k7ApnomxYWO/AxV1UhZRVjvIqczwo="
       }
     },
     "AppointmentHandlerEventSourceMappingSQSAppointmentsCompletionQueue": {
@@ -444,6 +444,27 @@
           "Ref": "HttpApi"
         },
         "RouteKey": "GET /appointments/{insuredId}",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "HttpApiIntegrationAppointmentHandler"
+              }
+            ]
+          ]
+        }
+      },
+      "DependsOn": "HttpApiIntegrationAppointmentHandler"
+    },
+    "HttpApiRouteGetAppointmentsInsuredidVarAppointmentidVar": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "GET /appointments/{insuredId}/{appointmentId}",
         "Target": {
           "Fn::Join": [
             "/",
@@ -822,7 +843,7 @@
     "SwaggerSpecLambdaFunctionQualifiedArn": {
       "Description": "Current Lambda function version",
       "Value": {
-        "Ref": "SwaggerSpecLambdaVersionAKV387ywqNaAPvLqcXCCP6bywRKV2OnSmcRPi2nq9c"
+        "Ref": "SwaggerSpecLambdaVersionm0zEyauaaU2xxrbHPVCNcZYgbC7D28DAxAp6t2ESGk"
       },
       "Export": {
         "Name": "sls-appointment-api-dev-SwaggerSpecLambdaFunctionQualifiedArn"
@@ -831,7 +852,7 @@
     "SwaggerLambdaFunctionQualifiedArn": {
       "Description": "Current Lambda function version",
       "Value": {
-        "Ref": "SwaggerLambdaVersionX4ZFjMBdeiHLPGii89OROh23QM8bjJECftYLrNGhJU"
+        "Ref": "SwaggerLambdaVersion998lA8qmaeILuSUX5F7DdaYVIo85FE5l3nzNqMBM"
       },
       "Export": {
         "Name": "sls-appointment-api-dev-SwaggerLambdaFunctionQualifiedArn"
@@ -840,7 +861,7 @@
     "AppointmentHandlerLambdaFunctionQualifiedArn": {
       "Description": "Current Lambda function version",
       "Value": {
-        "Ref": "AppointmentHandlerLambdaVersionTH8jwwaaPerW4apbHCnWraz0ZtyKHBGAMShT235QQQ"
+        "Ref": "AppointmentHandlerLambdaVersionNbGgbBwxOoAhX3927vkfHEaqLm6g4pfAY5khGSSznM"
       },
       "Export": {
         "Name": "sls-appointment-api-dev-AppointmentHandlerLambdaFunctionQualifiedArn"
