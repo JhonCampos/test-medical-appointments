@@ -5,7 +5,7 @@ import {
 } from '../packages/core/src/application/dtos/AppointmentDtos';
 import * as fs from 'fs';
 import * as path from 'path';
-import { z } from 'zod';
+import { z } from 'zod/v4';
 import * as yaml from 'yaml';
 
 // ==============================================================================
@@ -13,10 +13,26 @@ import * as yaml from 'yaml';
 // ==============================================================================
 console.log('Generando JSON Schemas desde Zod en memoria...');
 
+// --- Esquemas de la aplicación ---
 const createAppointmentRequestSchema = z.toJSONSchema(CreateAppointmentSchema);
 const listAppointmentsParamsSchema = z.toJSONSchema(ListAppointmentsRequestSchema);
-const appointmentResponseSchema =  z.toJSONSchema(AppointmentResponseSchema);
+const appointmentResponseSchema = z.toJSONSchema(AppointmentResponseSchema);
 const appointmentsListResponseSchema = z.toJSONSchema(z.array(AppointmentResponseSchema));
+
+// --- Esquema reutilizable para respuestas de error ---
+const ZodErrorIssueSchema = z.object({
+  code: z.string(),
+  path: z.array(z.union([z.string(), z.number()])),
+  message: z.string(),
+});
+
+const ErrorResponseSchema = z.object({
+  code: z.string().describe('Código de error estandarizado (ej. BAD_REQUEST).'),
+  message: z.string().describe('Mensaje legible que describe el error.'),
+  errors: z.array(ZodErrorIssueSchema).optional().describe('Lista de errores de validación detallados (opcional).'),
+});
+const errorResponseJsonSchema = z.toJSONSchema(ErrorResponseSchema);
+
 
 console.log('✅ Schemas generados.');
 
@@ -58,6 +74,11 @@ const openApiSpec = {
           },
           '400': {
             description: 'Datos de la solicitud inválidos.',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' },
+              },
+            },
           },
         },
       },
@@ -86,9 +107,19 @@ const openApiSpec = {
           },
           '400': {
             description: 'El ID del asegurado es inválido.',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' },
+              },
+            },
           },
           '404': {
             description: 'Asegurado no encontrado o sin citas.',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' },
+              },
+            },
           },
         },
       },
@@ -101,6 +132,7 @@ const openApiSpec = {
       ListAppointmentsParams: listAppointmentsParamsSchema,
       AppointmentResponse: appointmentResponseSchema,
       AppointmentsListResponse: appointmentsListResponseSchema,
+      ErrorResponse: errorResponseJsonSchema, // Se añade el schema de error
     },
   },
 };

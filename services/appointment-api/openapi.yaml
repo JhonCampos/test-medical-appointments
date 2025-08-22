@@ -27,6 +27,10 @@ paths:
                 $ref: "#/components/schemas/AppointmentResponse"
         "400":
           description: Datos de la solicitud inválidos.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /appointments/{insuredId}:
     get:
       summary: Listar citas por asegurado
@@ -50,8 +54,16 @@ paths:
                 $ref: "#/components/schemas/AppointmentsListResponse"
         "400":
           description: El ID del asegurado es inválido.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         "404":
           description: Asegurado no encontrado o sin citas.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 components:
   schemas:
     CreateAppointmentRequest:
@@ -169,3 +181,38 @@ components:
           - createdAt
           - updatedAt
         additionalProperties: false
+    ErrorResponse:
+      $schema: https://json-schema.org/draft/2020-12/schema
+      type: object
+      properties:
+        code:
+          description: Código de error estandarizado (ej. BAD_REQUEST).
+          type: string
+        message:
+          description: Mensaje legible que describe el error.
+          type: string
+        errors:
+          description: Lista de errores de validación detallados (opcional).
+          type: array
+          items:
+            type: object
+            properties:
+              code:
+                type: string
+              path:
+                type: array
+                items:
+                  anyOf:
+                    - type: string
+                    - type: number
+              message:
+                type: string
+            required:
+              - code
+              - path
+              - message
+            additionalProperties: false
+      required:
+        - code
+        - message
+      additionalProperties: false
