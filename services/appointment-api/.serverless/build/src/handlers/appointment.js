@@ -19042,7 +19042,7 @@ function date4(params) {
 // ../../node_modules/.pnpm/zod@4.0.17/node_modules/zod/v4/classic/external.js
 config(en_default());
 
-// ../../packages/core/src/domain/entities/Appointment.ts
+// ../../packages/core/src/application/dtos/AppointmentDtos.ts
 var AppointmentSchema = external_exports.object({
   appointmentId: external_exports.string(),
   insuredId: external_exports.string().length(5),
@@ -19052,6 +19052,28 @@ var AppointmentSchema = external_exports.object({
   createdAt: external_exports.iso.datetime(),
   updatedAt: external_exports.iso.datetime()
 });
+var CreateAppointmentSchema = external_exports.object({
+  insuredId: external_exports.string().regex(/^[0-9]{5}$/, "El insuredId debe ser de 5 d\xEDgitos num\xE9ricos."),
+  scheduleId: external_exports.number().int().positive(),
+  countryISO: external_exports.enum(["PE", "CL"])
+});
+var ListAppointmentsRequestSchema = external_exports.object({
+  insuredId: external_exports.string().regex(/^[0-9]{5}$/, "El insuredId debe ser de 5 d\xEDgitos num\xE9ricos.")
+});
+var SnsAppointmentEventSchema = external_exports.object({
+  appointmentId: external_exports.string(),
+  insuredId: external_exports.string(),
+  scheduleId: external_exports.number(),
+  countryISO: external_exports.enum(["PE", "CL"]),
+  createdAt: external_exports.iso.datetime()
+});
+var UpdateAppointmentStatusEventSchema = external_exports.object({
+  appointmentId: external_exports.string(),
+  insuredId: external_exports.string(),
+  status: external_exports.literal("PROCESSED")
+});
+
+// ../../packages/core/src/domain/entities/Appointment.ts
 var AppointmentEntity = class _AppointmentEntity {
   props;
   constructor(props) {
@@ -19449,14 +19471,21 @@ var lambdaHandlerWrapper = (handler2) => async (event, context) => {
     if (result === void 0 || result === null) {
       return;
     }
-    if (typeof result === "object" && result.statusCode && "body" in result) {
-      return result;
+    if (typeof result === "object" && "statusCode" in result && "body" in result) {
+      return {
+        ...result,
+        headers: {
+          "Content-Type": "application/json",
+          ...result.headers
+        },
+        body: typeof result.body === "string" ? result.body : JSON.stringify(result.body)
+      };
     }
     if (event.requestContext) {
       return {
-        statusCode: result.statusCode || 200,
+        statusCode: 200,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(result.body !== void 0 ? result.body : result)
+        body: JSON.stringify(result)
       };
     }
     return result;
@@ -19480,37 +19509,6 @@ function validateAndParse(schema, data) {
     throw error43;
   }
 }
-
-// ../../packages/core/src/application/dtos/AppointmentDtos.ts
-var AppointmentSchema2 = external_exports.object({
-  appointmentId: external_exports.string(),
-  insuredId: external_exports.string().length(5),
-  scheduleId: external_exports.number().int().positive(),
-  countryISO: external_exports.enum(["PE", "CL"]),
-  status: external_exports.enum(["PENDING", "COMPLETED", "FAILED"]),
-  createdAt: external_exports.iso.datetime(),
-  updatedAt: external_exports.iso.datetime()
-});
-var CreateAppointmentSchema = external_exports.object({
-  insuredId: external_exports.string().regex(/^[0-9]{5}$/, "El insuredId debe ser de 5 d\xEDgitos num\xE9ricos."),
-  scheduleId: external_exports.number().int().positive(),
-  countryISO: external_exports.enum(["PE", "CL"])
-});
-var ListAppointmentsRequestSchema = external_exports.object({
-  insuredId: external_exports.string().regex(/^[0-9]{5}$/, "El insuredId debe ser de 5 d\xEDgitos num\xE9ricos.")
-});
-var SnsAppointmentEventSchema = external_exports.object({
-  appointmentId: external_exports.string(),
-  insuredId: external_exports.string(),
-  scheduleId: external_exports.number(),
-  countryISO: external_exports.enum(["PE", "CL"]),
-  createdAt: external_exports.iso.datetime()
-});
-var UpdateAppointmentStatusEventSchema = external_exports.object({
-  appointmentId: external_exports.string(),
-  insuredId: external_exports.string(),
-  status: external_exports.literal("PROCESSED")
-});
 
 // src/handlers/appointment.ts
 async function appointmentRouter(event) {

@@ -73,6 +73,18 @@ El proyecto se compone de dos servicios que deben desplegarse de forma independi
 
 Estos comandos utilizarán las credenciales de AWS configuradas en su entorno para provisionar toda la infraestructura necesaria a través de CloudFormation.
 
+## Pruebas de Endpoints con cURL
+
+Para verificar que la API desplegada funciona correctamente, puedes utilizar el script `scripts/test-api.sh`. Este script realiza una serie de peticiones cURL a los endpoints principales.
+
+**Uso:**
+
+```bash
+./scripts/test-api.sh <URL_BASE_DE_LA_API>
+```
+
+**Importante:** La `<URL_BASE_DE_LA_API>` es la URL raíz de la API desplegada en AWS. Esta URL te será enviada por correo electrónico una vez que la infraestructura esté lista.
+
 ## Estructura del Proyecto (Monorepo)
 
 El código está organizado en los siguientes paquetes y servicios:
