@@ -9,7 +9,7 @@ import { IAppointmentCountryRepository } from '@core/domain/ports/repositories/I
  */
 export class ProcessAppointmentCLUseCase {
   constructor(
-    private readonly rdsRepository: IAppointmentCountryRepository,
+    private readonly countryRepository: IAppointmentCountryRepository,
     private readonly confirmationPublisher: IConfirmationPublisher
   ) {}
 
@@ -27,7 +27,7 @@ export class ProcessAppointmentCLUseCase {
     // Aquí iría la futura lógica de negocio específica para Chile.
     console.log(`Executing Chile-specific appointment processing for ID: ${appointmentEvent.appointmentId}`);
 
-    await this.rdsRepository.save(appointmentToSave);
+    await this.countryRepository.save(appointmentToSave);
 
     await this.confirmationPublisher.publish({
       appointmentId: appointmentToSave.appointmentId,

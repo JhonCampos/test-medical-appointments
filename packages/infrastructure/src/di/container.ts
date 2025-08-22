@@ -11,13 +11,13 @@ import { AppointmentRdsRepository } from '../persistence/rds/AppointmentRdsRepos
 import { EventBridgePublisher } from '../messaging/EventBridgePublisher';
 
 const container = createContainer({
-  injectionMode: InjectionMode.PROXY,
+  injectionMode: InjectionMode.CLASSIC,
 });
 
 container.register({
   // Repositorios
   appointmentRepository: asClass(DynamoDbAppointmentRepository).singleton(),
-  rdsRepository: asClass(AppointmentRdsRepository).singleton(),
+  countryRepository: asClass(AppointmentRdsRepository).singleton(),
   
   // Publicadores de Eventos
   eventPublisher: asClass(SnsEventPublisher).singleton(),

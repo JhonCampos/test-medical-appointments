@@ -1,0 +1,423 @@
+{
+  "service": {
+    "service": "appointment-processor",
+    "serviceObject": {
+      "name": "appointment-processor"
+    },
+    "provider": {
+      "name": "aws",
+      "runtime": "nodejs20.x",
+      "region": "us-east-2",
+      "stage": "dev",
+      "profile": "aivoxia",
+      "tags": {
+        "app-id": "test-medical-appoinments",
+        "app-center-cost": "test-medical-appoinments",
+        "app-env": "test"
+      },
+      "environment": {
+        "EVENT_BUS_NAME": "appointment-event-bus-dev"
+      },
+      "versionFunctions": true,
+      "compiledCloudFormationTemplate": {
+        "AWSTemplateFormatVersion": "2010-09-09",
+        "Description": "The AWS CloudFormation template for this Serverless application",
+        "Resources": {
+          "ProcessPELogGroup": {
+            "Type": "AWS::Logs::LogGroup",
+            "Properties": {
+              "LogGroupName": "/aws/lambda/appointment-processor-dev-processPE"
+            }
+          },
+          "ProcessCLLogGroup": {
+            "Type": "AWS::Logs::LogGroup",
+            "Properties": {
+              "LogGroupName": "/aws/lambda/appointment-processor-dev-processCL"
+            }
+          },
+          "IamRoleLambdaExecution": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+              "AssumeRolePolicyDocument": {
+                "Version": "2012-10-17",
+                "Statement": [
+                  {
+                    "Effect": "Allow",
+                    "Principal": {
+                      "Service": [
+                        "lambda.amazonaws.com"
+                      ]
+                    },
+                    "Action": [
+                      "sts:AssumeRole"
+                    ]
+                  }
+                ]
+              },
+              "Policies": [
+                {
+                  "PolicyName": {
+                    "Fn::Join": [
+                      "-",
+                      [
+                        "appointment-processor",
+                        "dev",
+                        "lambda"
+                      ]
+                    ]
+                  },
+                  "PolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                      {
+                        "Effect": "Allow",
+                        "Action": [
+                          "logs:CreateLogStream",
+                          "logs:CreateLogGroup",
+                          "logs:TagResource"
+                        ],
+                        "Resource": [
+                          {
+                            "Fn::Sub": "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/appointment-processor-dev*:*"
+                          }
+                        ]
+                      },
+                      {
+                        "Effect": "Allow",
+                        "Action": [
+                          "logs:PutLogEvents"
+                        ],
+                        "Resource": [
+                          {
+                            "Fn::Sub": "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/appointment-processor-dev*:*:*"
+                          }
+                        ]
+                      },
+                      {
+                        "Effect": "Allow",
+                        "Action": [
+                          "sqs:ReceiveMessage",
+                          "sqs:DeleteMessage",
+                          "sqs:GetQueueAttributes"
+                        ],
+                        "Resource": [
+                          {
+                            "Fn::Join": [
+                              ":",
+                              [
+                                "arn:aws:sqs",
+                                "us-east-2",
+                                {
+                                  "Ref": "AWS::AccountId"
+                                },
+                                "appointments-queue-pe-dev"
+                              ]
+                            ]
+                          },
+                          {
+                            "Fn::Join": [
+                              ":",
+                              [
+                                "arn:aws:sqs",
+                                "us-east-2",
+                                {
+                                  "Ref": "AWS::AccountId"
+                                },
+                                "appointments-queue-cl-dev"
+                              ]
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                }
+              ],
+              "Path": "/",
+              "RoleName": {
+                "Fn::Join": [
+                  "-",
+                  [
+                    "appointment-processor",
+                    "dev",
+                    {
+                      "Ref": "AWS::Region"
+                    },
+                    "lambdaRole"
+                  ]
+                ]
+              }
+            }
+          },
+          "ProcessPELambdaFunction": {
+            "Type": "AWS::Lambda::Function",
+            "Properties": {
+              "Code": {
+                "S3Bucket": "serverless-framework-deployments-us-east-2-91b3aea6-42e2",
+                "S3Key": "serverless/appointment-processor/dev/1755825670903-2025-08-22T01:21:10.903Z/appointment-processor-processPE.zip"
+              },
+              "Handler": "src/handlers/processPE.handler",
+              "Runtime": "nodejs20.x",
+              "FunctionName": "appointment-processor-dev-processPE",
+              "MemorySize": 1024,
+              "Timeout": 6,
+              "Tags": [
+                {
+                  "Key": "app-id",
+                  "Value": "test-medical-appoinments"
+                },
+                {
+                  "Key": "app-center-cost",
+                  "Value": "test-medical-appoinments"
+                },
+                {
+                  "Key": "app-env",
+                  "Value": "test"
+                }
+              ],
+              "Environment": {
+                "Variables": {
+                  "EVENT_BUS_NAME": "appointment-event-bus-dev",
+                  "NODE_OPTIONS": "--enable-source-maps"
+                }
+              },
+              "Role": {
+                "Fn::GetAtt": [
+                  "IamRoleLambdaExecution",
+                  "Arn"
+                ]
+              }
+            },
+            "DependsOn": [
+              "ProcessPELogGroup"
+            ]
+          },
+          "ProcessCLLambdaFunction": {
+            "Type": "AWS::Lambda::Function",
+            "Properties": {
+              "Code": {
+                "S3Bucket": "serverless-framework-deployments-us-east-2-91b3aea6-42e2",
+                "S3Key": "serverless/appointment-processor/dev/1755825670903-2025-08-22T01:21:10.903Z/appointment-processor-processCL.zip"
+              },
+              "Handler": "src/handlers/processCL.handler",
+              "Runtime": "nodejs20.x",
+              "FunctionName": "appointment-processor-dev-processCL",
+              "MemorySize": 1024,
+              "Timeout": 6,
+              "Tags": [
+                {
+                  "Key": "app-id",
+                  "Value": "test-medical-appoinments"
+                },
+                {
+                  "Key": "app-center-cost",
+                  "Value": "test-medical-appoinments"
+                },
+                {
+                  "Key": "app-env",
+                  "Value": "test"
+                }
+              ],
+              "Environment": {
+                "Variables": {
+                  "EVENT_BUS_NAME": "appointment-event-bus-dev",
+                  "NODE_OPTIONS": "--enable-source-maps"
+                }
+              },
+              "Role": {
+                "Fn::GetAtt": [
+                  "IamRoleLambdaExecution",
+                  "Arn"
+                ]
+              }
+            },
+            "DependsOn": [
+              "ProcessCLLogGroup"
+            ]
+          },
+          "ProcessPELambdaVersionYNVWi8EbXslB40VoMYuQJBMsL1aFJgEJbW7eg6tlrE": {
+            "Type": "AWS::Lambda::Version",
+            "DeletionPolicy": "Retain",
+            "Properties": {
+              "FunctionName": {
+                "Ref": "ProcessPELambdaFunction"
+              },
+              "CodeSha256": "FUgwaD5rzUgZPEvw0KxqZGOXD4HJ8XT2s6TfAaq8u/w="
+            }
+          },
+          "ProcessCLLambdaVersion35wL1Yov8oXv8BERff2YCuinsuVvBfAjEoeYwXFmPM": {
+            "Type": "AWS::Lambda::Version",
+            "DeletionPolicy": "Retain",
+            "Properties": {
+              "FunctionName": {
+                "Ref": "ProcessCLLambdaFunction"
+              },
+              "CodeSha256": "3gTXe2G+7i/pfBUgrdmHEqgSrFiw5OM8wvpsm58frkA="
+            }
+          },
+          "ProcessPEEventSourceMappingSQSAppointmentsqueuepedev": {
+            "Type": "AWS::Lambda::EventSourceMapping",
+            "DependsOn": [
+              "IamRoleLambdaExecution"
+            ],
+            "Properties": {
+              "BatchSize": 10,
+              "EventSourceArn": {
+                "Fn::Join": [
+                  ":",
+                  [
+                    "arn:aws:sqs",
+                    "us-east-2",
+                    {
+                      "Ref": "AWS::AccountId"
+                    },
+                    "appointments-queue-pe-dev"
+                  ]
+                ]
+              },
+              "FunctionName": {
+                "Fn::GetAtt": [
+                  "ProcessPELambdaFunction",
+                  "Arn"
+                ]
+              },
+              "Enabled": true
+            }
+          },
+          "ProcessCLEventSourceMappingSQSAppointmentsqueuecldev": {
+            "Type": "AWS::Lambda::EventSourceMapping",
+            "DependsOn": [
+              "IamRoleLambdaExecution"
+            ],
+            "Properties": {
+              "BatchSize": 10,
+              "EventSourceArn": {
+                "Fn::Join": [
+                  ":",
+                  [
+                    "arn:aws:sqs",
+                    "us-east-2",
+                    {
+                      "Ref": "AWS::AccountId"
+                    },
+                    "appointments-queue-cl-dev"
+                  ]
+                ]
+              },
+              "FunctionName": {
+                "Fn::GetAtt": [
+                  "ProcessCLLambdaFunction",
+                  "Arn"
+                ]
+              },
+              "Enabled": true
+            }
+          }
+        },
+        "Outputs": {
+          "ServerlessDeploymentBucketName": {
+            "Value": "serverless-framework-deployments-us-east-2-91b3aea6-42e2",
+            "Export": {
+              "Name": "sls-appointment-processor-dev-ServerlessDeploymentBucketName"
+            }
+          },
+          "ProcessPELambdaFunctionQualifiedArn": {
+            "Description": "Current Lambda function version",
+            "Value": {
+              "Ref": "ProcessPELambdaVersionYNVWi8EbXslB40VoMYuQJBMsL1aFJgEJbW7eg6tlrE"
+            },
+            "Export": {
+              "Name": "sls-appointment-processor-dev-ProcessPELambdaFunctionQualifiedArn"
+            }
+          },
+          "ProcessCLLambdaFunctionQualifiedArn": {
+            "Description": "Current Lambda function version",
+            "Value": {
+              "Ref": "ProcessCLLambdaVersion35wL1Yov8oXv8BERff2YCuinsuVvBfAjEoeYwXFmPM"
+            },
+            "Export": {
+              "Name": "sls-appointment-processor-dev-ProcessCLLambdaFunctionQualifiedArn"
+            }
+          }
+        }
+      },
+      "vpc": {}
+    },
+    "pluginsData": {},
+    "functions": {
+      "processPE": {
+        "handler": "src/handlers/processPE.handler",
+        "events": [
+          {
+            "sqs": {
+              "arn": {
+                "$ref": "$[\"service\"][\"provider\"][\"compiledCloudFormationTemplate\"][\"Resources\"][\"IamRoleLambdaExecution\"][\"Properties\"][\"Policies\"][0][\"PolicyDocument\"][\"Statement\"][2][\"Resource\"][0]"
+              }
+            }
+          }
+        ],
+        "name": "appointment-processor-dev-processPE",
+        "environment": {
+          "NODE_OPTIONS": "--enable-source-maps"
+        },
+        "package": {
+          "artifact": "/Users/jcampos/test-medical-appointments/services/appointment-processor/.serverless/build/appointment-processor-processPE.zip"
+        },
+        "memory": 1024,
+        "timeout": 6,
+        "runtime": "nodejs20.x",
+        "vpc": {},
+        "versionLogicalId": "ProcessPELambdaVersionYNVWi8EbXslB40VoMYuQJBMsL1aFJgEJbW7eg6tlrE"
+      },
+      "processCL": {
+        "handler": "src/handlers/processCL.handler",
+        "events": [
+          {
+            "sqs": {
+              "arn": {
+                "$ref": "$[\"service\"][\"provider\"][\"compiledCloudFormationTemplate\"][\"Resources\"][\"IamRoleLambdaExecution\"][\"Properties\"][\"Policies\"][0][\"PolicyDocument\"][\"Statement\"][2][\"Resource\"][1]"
+              }
+            }
+          }
+        ],
+        "name": "appointment-processor-dev-processCL",
+        "environment": {
+          "NODE_OPTIONS": "--enable-source-maps"
+        },
+        "package": {
+          "artifact": "/Users/jcampos/test-medical-appointments/services/appointment-processor/.serverless/build/appointment-processor-processCL.zip"
+        },
+        "memory": 1024,
+        "timeout": 6,
+        "runtime": "nodejs20.x",
+        "vpc": {},
+        "versionLogicalId": "ProcessCLLambdaVersion35wL1Yov8oXv8BERff2YCuinsuVvBfAjEoeYwXFmPM"
+      }
+    },
+    "configValidationMode": "warn",
+    "serviceFilename": "serverless",
+    "initialServerlessConfig": {
+      "service": "appointment-processor",
+      "provider": {
+        "$ref": "$[\"service\"][\"provider\"]"
+      },
+      "package": {
+        "individually": true,
+        "artifactsS3KeyDirname": "serverless/appointment-processor/dev/code-artifacts",
+        "deploymentBucket": "serverless-framework-deployments-us-east-2-91b3aea6-42e2",
+        "artifactDirectoryName": "serverless/appointment-processor/dev/1755825670903-2025-08-22T01:21:10.903Z"
+      },
+      "functions": {
+        "$ref": "$[\"service\"][\"functions\"]"
+      }
+    },
+    "appId": null,
+    "orgId": null,
+    "layers": {}
+  },
+  "package": {
+    "individually": true,
+    "artifactDirectoryName": "serverless/appointment-processor/dev/1755825670903-2025-08-22T01:21:10.903Z",
+    "artifact": ""
+  }
+}

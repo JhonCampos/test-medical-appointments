@@ -2,9 +2,9 @@ import { container } from '@infrastructure/di/container';
 import { lambdaHandlerWrapper } from '@infrastructure/common/LambdaHandlerWrapper';
 import { validateAndParse } from '@core/common/utils/validation';
 
-import { CreateAppointmentUseCase } from '@core/application/use-cases/CreateAppointment';
-import { ListAppointmentsUseCase } from '@core/application/use-cases/ListAppointments';
-import { UpdateAppointmentStatusUseCase } from '@core/application/use-cases/UpdateAppointmentStatus';
+import type { CreateAppointmentUseCase } from '@core/application/use-cases/CreateAppointment';
+import type { ListAppointmentsUseCase } from '@core/application/use-cases/ListAppointments';
+import type { UpdateAppointmentStatusUseCase } from '@core/application/use-cases/UpdateAppointmentStatus';
 
 import { CreateAppointmentSchema, ListAppointmentsRequestSchema, UpdateAppointmentStatusEventSchema } from '@core/application/dtos/AppointmentDtos';
 
