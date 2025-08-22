@@ -1,4 +1,3 @@
-import { createPool, Pool } from 'mysql2/promise';
 import { Appointment } from '@core/domain/entities/Appointment';
 import { IAppointmentCountryRepository } from '@core/domain/ports/repositories/IAppointmentCountryRepository';
 

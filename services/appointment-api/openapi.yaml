@@ -64,6 +64,45 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+  /appointments/{insuredId}/{appointmentId}:
+    get:
+      summary: Obtener una cita específica
+      description: Obtiene los detalles de una cita médica específica por su ID.
+      tags:
+        - Appointments
+      parameters:
+        - name: insuredId
+          in: path
+          required: true
+          schema: &a2
+            type: string
+            pattern: ^[0-9]{5}$
+        - name: appointmentId
+          in: path
+          required: true
+          schema: &a3
+            type: string
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000)$
+      responses:
+        "200":
+          description: Detalles de la cita obtenidos exitosamente.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AppointmentResponse"
+        "400":
+          description: Uno o más IDs son inválidos.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: La cita no fue encontrada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 components:
   schemas:
     CreateAppointmentRequest:
@@ -94,6 +133,16 @@ components:
         insuredId: *a1
       required:
         - insuredId
+      additionalProperties: false
+    GetAppointmentParams:
+      $schema: https://json-schema.org/draft/2020-12/schema
+      type: object
+      properties:
+        insuredId: *a2
+        appointmentId: *a3
+      required:
+        - insuredId
+        - appointmentId
       additionalProperties: false
     AppointmentResponse:
       $schema: https://json-schema.org/draft/2020-12/schema

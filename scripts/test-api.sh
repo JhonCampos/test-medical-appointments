@@ -19,17 +19,25 @@ function print_separator() {
 "
 }
 
-# --- PRUEBA 1: Crear una cita para Perú (PE) ---
+# --- PRUEBA 1: Crear una cita para Perú (PE) y capturar la respuesta ---
 print_separator
 echo "Prueba 1: Creando una nueva cita para el asegurado 01234 (Perú)..."
-curl -X POST \
+CREATE_RESPONSE=$(curl -s -X POST \
   "${API_URL}/appointments" \
   -H 'Content-Type: application/json' \
   -d '{
     "insuredId": "01234",
     "scheduleId": 101,
     "countryISO": "PE"
-  }'
+  }')
+
+echo "Respuesta de creación:"
+echo $CREATE_RESPONSE
+
+# Extraer datos de la respuesta para usarlos después
+APPOINTMENT_ID=$(echo $CREATE_RESPONSE | jq -r '.appointmentId')
+INSURED_ID=$(echo $CREATE_RESPONSE | jq -r '.insuredId')
+
 
 # --- PRUEBA 2: Crear una cita para Chile (CL) ---
 print_separator
@@ -52,6 +60,16 @@ curl "${API_URL}/appointments/01234"
 print_separator
 echo "Prueba 4: Obteniendo las citas para el asegurado 56789..."
 curl "${API_URL}/appointments/56789"
+
+# --- PRUEBA 5: Obtener la cita específica creada en la Prueba 1 ---
+if [ -n "$APPOINTMENT_ID" ] && [ -n "$INSURED_ID" ]; then
+  print_separator
+  echo "Prueba 5: Obteniendo la cita específica con ID $APPOINTMENT_ID para el asegurado $INSURED_ID..."
+  curl "${API_URL}/appointments/${INSURED_ID}/${APPOINTMENT_ID}"
+else
+  echo "No se pudo obtener el ID de la cita o del asegurado de la Prueba 1. Omitiendo la Prueba 5."
+fi
+
 
 print_separator
 echo "Pruebas finalizadas."

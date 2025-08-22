@@ -64,6 +64,9 @@ functions:
       - httpApi:
           path: /appointments/{insuredId}
           method: get
+      - httpApi:
+          path: /appointments/{insuredId}/{appointmentId}
+          method: get
       - sqs:
           arn:
             Fn::GetAtt: [AppointmentsCompletionQueue, Arn]

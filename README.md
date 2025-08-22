@@ -49,13 +49,40 @@ Esto levantará un servidor local. Los endpoints de la API estarán disponibles 
 
 ### Gestión de la Documentación (OpenAPI)
 
-El proyecto incluye un script para generar una especificación OpenAPI (`openapi.yaml`) a partir de los comentarios JSDoc en los handlers de la API.
+El proyecto incluye un script para generar una especificación OpenAPI (`openapi.yaml`) a partir del lo que esté definido en el archivo ./scripts/generate-openapi.ts.
 
 -   **Para generar el archivo `openapi.yaml`**, ejecute:
     ```bash
     pnpm run docs:generate
     ```
--   **Para añadir más documentación**, debe editar los comentarios JSDoc del archivo `services/appointment-api/src/handlers/appointment.ts`. El script `scripts/generate-openapi.ts` procesará estos comentarios para actualizar la especificación.
+
+### Acceso a la Documentación
+
+Una vez que la API está desplegada, puedes acceder a la documentación interactiva y a la especificación OpenAPI a través de los siguientes endpoints:
+
+-   **Swagger UI (Interfaz Interactiva)**: `https://<URL_BASE_DE_LA_API>/docs`
+-   **Especificación OpenAPI (YAML)**: `https://<URL_BASE_DE_LA_API>/openapi.yaml`
+
+Sustituye `<URL_BASE_DE_LA_API>` por la URL que recibiste por correo.
+
+### Endpoints Disponibles
+
+A continuación se detallan las rutas disponibles en la API:
+
+| Método | Ruta                                                                      |
+|--------|---------------------------------------------------------------------------|
+| POST   | `http://localhost:3000/appointments`                                      |
+| POST   | `http://localhost:3000/2015-03-31/functions/appointmentHandler/invocations` |
+| GET    | `http://localhost:3000/appointments/{insuredId}`                          |
+| POST   | `http://localhost:3000/2015-03-31/functions/appointmentHandler/invocations` |
+| GET    | `http://localhost:3000/appointments/{insuredId}/{appointmentId}`          |
+| POST   | `http://localhost:3000/2015-03-31/functions/appointmentHandler/invocations` |
+| GET    | `http://localhost:3000/docs`                                              |
+| POST   | `http://localhost:3000/2015-03-31/functions/swagger/invocations`          |
+| GET    | `http://localhost:3000/docs/{proxy*}`                                     |
+| POST   | `http://localhost:3000/2015-03-31/functions/swagger/invocations`          |
+| GET    | `http://localhost:3000/openapi.yaml`                                      |
+
 
 ### Despliegue en AWS
 

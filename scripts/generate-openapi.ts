@@ -1,6 +1,7 @@
 import { 
   CreateAppointmentSchema, 
   ListAppointmentsRequestSchema, 
+  GetAppointmentRequestSchema, // [!code ++]
   AppointmentResponseSchema 
 } from '../packages/core/src/application/dtos/AppointmentDtos';
 import * as fs from 'fs';
@@ -16,6 +17,7 @@ console.log('Generando JSON Schemas desde Zod en memoria...');
 // --- Esquemas de la aplicación ---
 const createAppointmentRequestSchema = z.toJSONSchema(CreateAppointmentSchema);
 const listAppointmentsParamsSchema = z.toJSONSchema(ListAppointmentsRequestSchema);
+const getAppointmentParamsSchema = z.toJSONSchema(GetAppointmentRequestSchema); // [!code ++]
 const appointmentResponseSchema = z.toJSONSchema(AppointmentResponseSchema);
 const appointmentsListResponseSchema = z.toJSONSchema(z.array(AppointmentResponseSchema));
 
@@ -124,15 +126,63 @@ const openApiSpec = {
         },
       },
     },
+    '/appointments/{insuredId}/{appointmentId}': { // [!code ++]
+      get: { // [!code ++]
+        summary: 'Obtener una cita específica', // [!code ++]
+        description: 'Obtiene los detalles de una cita médica específica por su ID.', // [!code ++]
+        tags: ['Appointments'], // [!code ++]
+        parameters: [ // [!code ++]
+          { // [!code ++]
+            name: 'insuredId', // [!code ++]
+            in: 'path', // [!code ++]
+            required: true, // [!code ++]
+            schema: getAppointmentParamsSchema.properties?.insuredId, // [!code ++]
+          }, // [!code ++]
+          { // [!code ++]
+            name: 'appointmentId', // [!code ++]
+            in: 'path', // [!code ++]
+            required: true, // [!code ++]
+            schema: getAppointmentParamsSchema.properties?.appointmentId, // [!code ++]
+          }, // [!code ++]
+        ], // [!code ++]
+        responses: { // [!code ++]
+          '200': { // [!code ++]
+            description: 'Detalles de la cita obtenidos exitosamente.', // [!code ++]
+            content: { // [!code ++]
+              'application/json': { // [!code ++]
+                schema: { $ref: '#/components/schemas/AppointmentResponse' }, // [!code ++]
+              }, // [!code ++]
+            }, // [!code ++]
+          }, // [!code ++]
+          '400': { // [!code ++]
+            description: 'Uno o más IDs son inválidos.', // [!code ++]
+            content: { // [!code ++]
+              'application/json': { // [!code ++]
+                schema: { $ref: '#/components/schemas/ErrorResponse' }, // [!code ++]
+              }, // [!code ++]
+            }, // [!code ++]
+          }, // [!code ++]
+          '404': { // [!code ++]
+            description: 'La cita no fue encontrada.', // [!code ++]
+            content: { // [!code ++]
+              'application/json': { // [!code ++]
+                schema: { $ref: '#/components/schemas/ErrorResponse' }, // [!code ++]
+              }, // [!code ++]
+            }, // [!code ++]
+          }, // [!code ++]
+        }, // [!code ++]
+      }, // [!code ++]
+    }, // [!code ++]
   },
   // Inyectar los schemas generados en la sección de componentes.
   components: {
     schemas: {
       CreateAppointmentRequest: createAppointmentRequestSchema,
       ListAppointmentsParams: listAppointmentsParamsSchema,
+      GetAppointmentParams: getAppointmentParamsSchema, // [!code ++]
       AppointmentResponse: appointmentResponseSchema,
       AppointmentsListResponse: appointmentsListResponseSchema,
-      ErrorResponse: errorResponseJsonSchema, // Se añade el schema de error
+      ErrorResponse: errorResponseJsonSchema,
     },
   },
 };

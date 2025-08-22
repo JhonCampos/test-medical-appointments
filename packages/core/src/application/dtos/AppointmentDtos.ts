@@ -41,3 +41,9 @@ export const UpdateAppointmentStatusEventSchema = z.object({
   status: z.literal('PROCESSED'),
 });
 export type UpdateAppointmentStatusEventDto = z.infer<typeof UpdateAppointmentStatusEventSchema>;
+
+export const GetAppointmentRequestSchema = z.object({ 
+  insuredId: z.string().regex(/^[0-9]{5}$/, "El insuredId debe ser de 5 dígitos numéricos."), // [!code ++]
+  appointmentId: z.string().uuid("El appointmentId debe ser un UUID válido."), // [!code ++]
+});
+export type GetAppointmentRequestDto = z.infer<typeof GetAppointmentRequestSchema>; // [!code ++]
