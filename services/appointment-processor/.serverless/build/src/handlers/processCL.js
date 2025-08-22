@@ -19039,7 +19039,7 @@ function date4(params) {
 // ../../node_modules/.pnpm/zod@4.0.17/node_modules/zod/v4/classic/external.js
 config(en_default());
 
-// ../../packages/core/src/domain/entities/Appointment.ts
+// ../../packages/core/src/application/dtos/AppointmentDtos.ts
 var AppointmentSchema = external_exports.object({
   appointmentId: external_exports.string(),
   insuredId: external_exports.string().length(5),
@@ -19049,34 +19049,6 @@ var AppointmentSchema = external_exports.object({
   createdAt: external_exports.iso.datetime(),
   updatedAt: external_exports.iso.datetime()
 });
-var AppointmentEntity = class _AppointmentEntity {
-  props;
-  constructor(props) {
-    this.props = { ...props };
-  }
-  static create(props) {
-    const now = (/* @__PURE__ */ new Date()).toISOString();
-    return new _AppointmentEntity({
-      ...props,
-      appointmentId: crypto.randomUUID(),
-      status: "PENDING",
-      createdAt: now,
-      updatedAt: now
-    });
-  }
-  get values() {
-    return this.props;
-  }
-  complete() {
-    if (this.props.status !== "PENDING") {
-      return;
-    }
-    this.props.status = "COMPLETED";
-    this.props.updatedAt = (/* @__PURE__ */ new Date()).toISOString();
-  }
-};
-
-// ../../packages/core/src/application/dtos/AppointmentDtos.ts
 var CreateAppointmentSchema = external_exports.object({
   insuredId: external_exports.string().regex(/^[0-9]{5}$/, "El insuredId debe ser de 5 d\xEDgitos num\xE9ricos."),
   scheduleId: external_exports.number().int().positive(),
@@ -19090,7 +19062,7 @@ var SnsAppointmentEventSchema = external_exports.object({
   insuredId: external_exports.string(),
   scheduleId: external_exports.number(),
   countryISO: external_exports.enum(["PE", "CL"]),
-  createdAt: external_exports.string().datetime()
+  createdAt: external_exports.iso.datetime()
 });
 var UpdateAppointmentStatusEventSchema = external_exports.object({
   appointmentId: external_exports.string(),
@@ -19100,6 +19072,35 @@ var UpdateAppointmentStatusEventSchema = external_exports.object({
 
 // ../../packages/infrastructure/src/di/container.ts
 var import_awilix = __toESM(require_awilix());
+
+// ../../packages/core/src/domain/entities/Appointment.ts
+var AppointmentEntity = class _AppointmentEntity {
+  props;
+  constructor(props) {
+    this.props = AppointmentSchema.parse(props);
+  }
+  static create(props) {
+    const now = (/* @__PURE__ */ new Date()).toISOString();
+    const appointmentData = {
+      ...props,
+      appointmentId: crypto.randomUUID(),
+      status: "PENDING",
+      createdAt: now,
+      updatedAt: now
+    };
+    return new _AppointmentEntity(appointmentData);
+  }
+  get values() {
+    return { ...this.props };
+  }
+  complete() {
+    if (this.props.status !== "PENDING") {
+      return;
+    }
+    this.props.status = "COMPLETED";
+    this.props.updatedAt = (/* @__PURE__ */ new Date()).toISOString();
+  }
+};
 
 // ../../packages/core/src/application/use-cases/CreateAppointment.ts
 var CreateAppointmentUseCase = class {
@@ -19430,21 +19431,89 @@ function validateAndParse(schema, data) {
   }
 }
 
+// ../../packages/infrastructure/src/common/ErrorHandler.ts
+function logError(error43) {
+  const logPayload = {
+    level: "ERROR",
+    timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+    error: {
+      name: error43.name,
+      message: error43.message,
+      stack: error43.stack,
+      ...error43 instanceof AppError && {
+        // Agrega contexto si es un AppError
+        code: error43.errorCode,
+        statusCode: error43.statusCode,
+        details: error43.errors || []
+      }
+    }
+  };
+  console.error(JSON.stringify(logPayload, null, 2));
+}
+function handleError(error43) {
+  if (error43 instanceof AppError) {
+    logError(error43);
+    return {
+      statusCode: error43.statusCode,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        code: error43.errorCode,
+        message: error43.message,
+        ...error43.errors && { errors: error43.errors }
+      })
+    };
+  }
+  const unexpectedError = error43 instanceof Error ? error43 : new Error("An unexpected error occurred.");
+  logError(unexpectedError);
+  return {
+    statusCode: 500 /* INTERNAL_SERVER_ERROR */,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      code: "SERVER_ERROR" /* ServerError */,
+      message: "Ocurri\xF3 un error inesperado."
+    })
+  };
+}
+
+// ../../packages/infrastructure/src/common/LambdaHandlerWrapper.ts
+var lambdaHandlerWrapper = (handler2) => async (event, context) => {
+  try {
+    console.log("Request Event:", JSON.stringify(event, null, 2));
+    const result = await handler2(event, context);
+    if (result === void 0 || result === null) {
+      return;
+    }
+    if (typeof result === "object" && result.statusCode && "body" in result) {
+      return result;
+    }
+    if (event.requestContext) {
+      return {
+        statusCode: result.statusCode || 200,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(result.body !== void 0 ? result.body : result)
+      };
+    }
+    return result;
+  } catch (error43) {
+    if (event.Records && Array.isArray(event.Records)) {
+      console.error("SQS Handler Error:", error43);
+      throw error43;
+    }
+    return handleError(error43);
+  }
+};
+
 // src/handlers/processCL.ts
-var handler = async (event) => {
+async function processCLHandler(event) {
   console.log("Received SQS event for CL:", JSON.stringify(event, null, 2));
   const useCase = container.resolve("processAppointmentCLUseCase");
   for (const record2 of event.Records) {
-    try {
-      const body = JSON.parse(record2.body);
-      const appointmentEvent = validateAndParse(SnsAppointmentEventSchema, body);
-      await useCase.execute(appointmentEvent);
-    } catch (error43) {
-      console.error("Failed to process CL record:", record2.body, error43);
-      throw error43;
-    }
+    const body = JSON.parse(record2.body);
+    const appointmentEvent = validateAndParse(SnsAppointmentEventSchema, body);
+    await useCase.execute(appointmentEvent);
   }
-};
+}
+var handler = lambdaHandlerWrapper(processCLHandler);
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   handler

@@ -136,7 +136,17 @@ module.exports = {
 
 // AppointmentDtos.ts
 import { z } from 'zod/v4';
-import { AppointmentSchema } from '../../domain/entities/Appointment';
+
+// Primero definimos el esquema de Appointment aquí para evitar importaciones circulares
+export const AppointmentSchema = z.object({
+  appointmentId: z.string(),
+  insuredId: z.string().length(5),
+  scheduleId: z.number().int().positive(),
+  countryISO: z.enum(['PE', 'CL']),
+  status: z.enum(['PENDING', 'COMPLETED', 'FAILED']),
+  createdAt: z.iso.datetime(),
+  updatedAt: z.iso.datetime(),
+});
 
 export const CreateAppointmentSchema = z.object({
   insuredId: z.string().regex(/^[0-9]{5}$/, "El insuredId debe ser de 5 dígitos numéricos."),
@@ -158,7 +168,7 @@ export const SnsAppointmentEventSchema = z.object({
   insuredId: z.string(),
   scheduleId: z.number(),
   countryISO: z.enum(['PE', 'CL']),
-  createdAt: z.string().datetime(),
+  createdAt: z.iso.datetime(),
 });
 export type SnsAppointmentEventDto = z.infer<typeof SnsAppointmentEventSchema>;
 
@@ -167,6 +177,7 @@ export const UpdateAppointmentStatusEventSchema = z.object({
   insuredId: z.string(),
   status: z.literal('PROCESSED'),
 });
+export type UpdateAppointmentStatusEventDto = z.infer<typeof UpdateAppointmentStatusEventSchema>;
 
 // ===== Directory: packages/core/src/application/use-cases =====
 
@@ -401,11 +412,11 @@ export class NotFoundError extends AppError {
 // ===== Directory: packages/core/src/common/utils =====
 
 // validation.ts
-import { z, ZodError } from 'zod';
-import {BadRequestError} from '../errors/AppError';
+import { z, ZodError } from 'zod/v4';
+import { BadRequestError } from '../errors/AppError';
 
 /**
- * Valida y parsea un objeto de datos usando un esquema de Zod.
+ * Valida y parsea un objeto de datos usando un esquema de Zod v4.
  * Si la validación falla, lanza un AppError estandarizado con los detalles.
  *
  * @template T El tipo inferido del esquema.
@@ -430,17 +441,8 @@ export function validateAndParse<T>(schema: z.ZodSchema<T>, data: unknown): T {
 // ===== Directory: packages/core/src/domain/entities =====
 
 // Appointment.ts
-import { z } from 'zod/v4';
-
-export const AppointmentSchema = z.object({
-  appointmentId: z.string(),
-  insuredId: z.string().length(5),
-  scheduleId: z.number().int().positive(),
-  countryISO: z.enum(['PE', 'CL']),
-  status: z.enum(['PENDING', 'COMPLETED', 'FAILED']),
-  createdAt: z.iso.datetime(),
-  updatedAt: z.iso.datetime(),
-});
+import { AppointmentSchema } from "@core/application/dtos/AppointmentDtos";
+import { z } from "zod/v4";
 
 export type Appointment = z.infer<typeof AppointmentSchema>;
 
@@ -448,22 +450,25 @@ export class AppointmentEntity {
   private props: Appointment;
 
   constructor(props: Appointment) {
-    this.props = { ...props };
+    // Validamos los props al construir la entidad
+    this.props = AppointmentSchema.parse(props);
   }
 
   static create(props: Omit<Appointment, 'appointmentId' | 'status' | 'createdAt' | 'updatedAt'>): AppointmentEntity {
     const now = new Date().toISOString();
-    return new AppointmentEntity({
+    const appointmentData: Appointment = {
       ...props,
       appointmentId: crypto.randomUUID(),
       status: 'PENDING',
       createdAt: now,
       updatedAt: now,
-    });
+    };
+    
+    return new AppointmentEntity(appointmentData);
   }
 
   get values(): Appointment {
-    return this.props;
+    return { ...this.props };
   }
 
   complete(): void {
@@ -610,24 +615,44 @@ export function handleError(error: unknown) {
 import { handleError } from './ErrorHandler';
 
 /**
- * Wrapper de alto nivel para los manejadores de Lambda.
- * Se encarga de la ejecución, el manejo de respuestas exitosas y la delegación
- * de errores al manejador centralizado.
- *
- * @param handler La función del manejador de Lambda a ejecutar.
+ * Wrapper simple para los manejadores de Lambda.
+ * Maneja tanto eventos HTTP (API Gateway) como eventos SQS de forma transparente.
  */
 export const lambdaHandlerWrapper = (handler: Function) => async (event: any, context: any) => {
   try {
     console.log('Request Event:', JSON.stringify(event, null, 2));
     const result = await handler(event, context);
 
-    return {
-      statusCode: result.statusCode || 200,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(result.body),
-    };
+    // Si el handler no retorna nada (típico en SQS), simplemente retornamos undefined
+    if (result === undefined || result === null) {
+      return;
+    }
+
+    // Si ya es una respuesta HTTP formateada, la retornamos tal como está
+    if (typeof result === 'object' && result.statusCode && 'body' in result) {
+      return result;
+    }
+
+    // Si es para API Gateway (tiene requestContext), formateamos como respuesta HTTP
+    if (event.requestContext) {
+      return {
+        statusCode: result.statusCode || 200,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(result.body !== undefined ? result.body : result),
+      };
+    }
+
+    // Para cualquier otro caso, retornamos el resultado tal como está
+    return result;
+    
   } catch (error: unknown) {
-    // Toda la lógica de manejo de errores se delega a nuestro nuevo manejador.
+    // Si es un evento SQS, re-lanzamos el error para que SQS maneje los reintentos
+    if (event.Records && Array.isArray(event.Records)) {
+      console.error('SQS Handler Error:', error);
+      throw error;
+    }
+    
+    // Para eventos HTTP, usamos nuestro manejador de errores
     return handleError(error);
   }
 };
@@ -1191,7 +1216,7 @@ describe('UpdateAppointmentStatusUseCase', () => {
 // ===== Directory: packages/test/core/common/utils =====
 
 // validation.test.ts
-import { z, ZodError } from 'zod';
+import { z, ZodError } from 'zod/v4';
 import { validateAndParse } from '@core/common/utils/validation';
 import { AppError, ErrorCode, HttpStatusCode } from '@core/common/errors/AppError';
 
@@ -1799,23 +1824,26 @@ import { container } from '@infrastructure/di/container';
 import { lambdaHandlerWrapper } from '@infrastructure/common/LambdaHandlerWrapper';
 import { validateAndParse } from '@core/common/utils/validation';
 
+// Importamos solo los tipos que necesitamos
 import type { CreateAppointmentUseCase } from '@core/application/use-cases/CreateAppointment';
 import type { ListAppointmentsUseCase } from '@core/application/use-cases/ListAppointments';
 import type { UpdateAppointmentStatusUseCase } from '@core/application/use-cases/UpdateAppointmentStatus';
 
-import { CreateAppointmentSchema, ListAppointmentsRequestSchema, UpdateAppointmentStatusEventSchema } from '@core/application/dtos/AppointmentDtos';
+import { 
+  CreateAppointmentSchema, 
+  ListAppointmentsRequestSchema, 
+  UpdateAppointmentStatusEventSchema 
+} from '@core/application/dtos/AppointmentDtos';
 
 /**
  * @description Punto de entrada principal para la API de Citas.
- * Enruta el evento entrante (API Gateway o SQS) al caso de uso apropiado.
- * @param event El evento de AWS (API Gateway Proxy o SQS).
+ * Maneja tanto eventos HTTP (API Gateway) como eventos SQS de forma simple.
  */
 async function appointmentRouter(event: any) {
-  // ----- Ruta 1: Evento de API Gateway -----
-  if (event.requestContext && event.requestContext.http) {
+  // ----- Ruta 1: Eventos HTTP (API Gateway) -----
+  if (event.requestContext?.http) {
     const httpMethod = event.requestContext.http.method;
 
-    // ----- Sub-Ruta 1.1: Crear Cita (POST /appointments) -----
     if (httpMethod === 'POST') {
       const body = JSON.parse(event.body);
       const dto = validateAndParse(CreateAppointmentSchema, body);
@@ -1824,14 +1852,13 @@ async function appointmentRouter(event: any) {
       const result = await useCase.execute(dto);
 
       return {
-        statusCode: 202, // Accepted
+        statusCode: 202,
         body: result,
       };
     }
 
-    // ----- Sub-Ruta 1.2: Listar Citas (GET /appointments/{insuredId}) -----
     if (httpMethod === 'GET') {
-      const { insuredId } = validateAndParse(ListAppointmentsRequestSchema, event.pathParameters);
+      const { insuredId } = validateAndParse(ListAppointmentsRequestSchema, event.pathParameters || {});
       
       const useCase = container.resolve<ListAppointmentsUseCase>('listAppointmentsUseCase');
       const result = await useCase.execute(insuredId);
@@ -1841,44 +1868,34 @@ async function appointmentRouter(event: any) {
         body: result,
       };
     }
+
+    throw new Error(`Método HTTP no soportado: ${httpMethod}`);
   }
 
-  // ----- Ruta 2: Evento de SQS (Actualización de Estado) -----
-  if (event.Records && event.Records[0].eventSource === 'aws:sqs') {
-    console.log('Received SQS event for status update:', JSON.stringify(event, null, 2));
+  // ----- Ruta 2: Eventos SQS -----
+  if (event.Records && Array.isArray(event.Records)) {
+    console.log('Processing SQS event for status update');
     const useCase = container.resolve<UpdateAppointmentStatusUseCase>('updateAppointmentStatusUseCase');
 
     for (const record of event.Records) {
-      try {
-        const body = JSON.parse(record.body);
-        const eventDetail = body.detail;
-        
-        const validatedEvent = validateAndParse(UpdateAppointmentStatusEventSchema, eventDetail);
+      const body = JSON.parse(record.body);
+      const eventDetail = body.detail;
+      
+      const validatedEvent = validateAndParse(UpdateAppointmentStatusEventSchema, eventDetail);
 
-        await useCase.execute({
-          appointmentId: validatedEvent.appointmentId,
-          insuredId: validatedEvent.insuredId,
-        });
-      } catch (error) {
-        console.error('Failed to process status update record:', record.body, error);
-        // Lanzar el error para que SQS pueda gestionar los reintentos
-        throw error;
-      }
+      await useCase.execute({
+        appointmentId: validatedEvent.appointmentId,
+        insuredId: validatedEvent.insuredId,
+      });
     }
-    // Para invocaciones de SQS exitosas, no se necesita retornar un body.
-    // El wrapper se encargará de la respuesta si no hay errores.
+
+    // Para SQS, no necesitamos retornar nada
     return;
   }
   
-  // Si el evento no coincide con ninguna ruta, es un error.
-  console.error('Evento no reconocido o no soportado:', JSON.stringify(event, null, 2));
-  throw new Error('Tipo de evento no soportado por este handler.');
+  throw new Error('Tipo de evento no soportado');
 }
 
-// Envolvemos nuestro enrutador con el manejador de errores y respuestas estándar.
-// Nota: El lambdaHandlerWrapper está diseñado para respuestas HTTP.
-// Para SQS, si hay un error, lo propagará correctamente. Si no hay error,
-// el wrapper no afectará la ejecución.
 export const handler = lambdaHandlerWrapper(appointmentRouter);// swagger.ts
 import * as fs from 'fs';
 import * as path from 'path';
@@ -2032,41 +2049,43 @@ import { ProcessAppointmentCLUseCase } from '@core/application/use-cases/Process
 import { container } from '@infrastructure/di/container';
 import { validateAndParse } from '@core/common/utils/validation';
 
-export const handler = async (event: any): Promise<void> => {
+import { lambdaHandlerWrapper } from '@infrastructure/common/LambdaHandlerWrapper';
+
+async function processCLHandler(event: any): Promise<void> {
   console.log('Received SQS event for CL:', JSON.stringify(event, null, 2));
+
   const useCase = container.resolve<ProcessAppointmentCLUseCase>('processAppointmentCLUseCase');
 
   for (const record of event.Records) {
-    try {
-      const body = JSON.parse(record.body);
-      const appointmentEvent = validateAndParse(SnsAppointmentEventSchema, body);
-      await useCase.execute(appointmentEvent);
-    } catch (error) {
-      console.error('Failed to process CL record:', record.body, error);
-      throw error;
-    }
+    const body = JSON.parse(record.body);
+    const appointmentEvent = validateAndParse(SnsAppointmentEventSchema, body);
+    await useCase.execute(appointmentEvent);
   }
-};// processPE.ts
+}
+
+export const handler = lambdaHandlerWrapper(processCLHandler);
+// processPE.ts
 import { SnsAppointmentEventSchema } from '@core/application/dtos/AppointmentDtos';
 import { ProcessAppointmentPEUseCase } from '@core/application/use-cases/ProcessAppointmentPE';
 import { container } from '@infrastructure/di/container';
 import { validateAndParse } from '@core/common/utils/validation';
+import { lambdaHandlerWrapper } from '@infrastructure/common/LambdaHandlerWrapper';
 
-export const handler = async (event: any): Promise<void> => {
+async function processPEHandler(event: any): Promise<void> {
   console.log('Received SQS event for PE:', JSON.stringify(event, null, 2));
+
   const useCase = container.resolve<ProcessAppointmentPEUseCase>('processAppointmentPEUseCase');
 
   for (const record of event.Records) {
-    try {
-      const body = JSON.parse(record.body);
-      const appointmentEvent = validateAndParse(SnsAppointmentEventSchema, body);
-      await useCase.execute(appointmentEvent);
-    } catch (error) {
-      console.error('Failed to process PE record:', record.body, error);
-      throw error;
-    }
+    const body = JSON.parse(record.body);
+    const appointmentEvent = validateAndParse(SnsAppointmentEventSchema, body);
+    await useCase.execute(appointmentEvent);
   }
-};
+}
+
+export const handler = lambdaHandlerWrapper(processPEHandler);
+
+
 
 // ===== Directory: . =====
 
