@@ -6,16 +6,13 @@ Este repositorio contiene un proyecto de prueba que implementa un sistema de age
 ## Consideraciones Importantes
 
 Es fundamental tener en cuenta los siguientes puntos al evaluar este proyecto:
-
-> - **Esquema de Monorepo**: Este proyecto se ha estructurado como un monorepo para facilitar la prueba y la evaluación en un único repositorio. En un entorno de producción con un equipo de desarrollo más grande, es probable que los servicios (`appointment-api`, `appointment-processor`) y los paquetes (`core`, `infrastructure`) residan en repositorios separados para mejorar la autonomía de los equipos y la independencia de los despliegues.
->
-> - **Prueba de Concepto**: Se debe entender que este proyecto es una prueba diseñada para corroborar los conocimientos técnicos requeridos para un rol específico. **No debe tomarse como base para una implementación en producción**, ya que carece de varios componentes críticos.
->
-> - **Omisiones Deliberadas**: Para mantener el enfoque en la lógica de negocio principal, se han omitido intencionadamente los siguientes aspectos:
->    - **Seguridad y Autenticación**: No hay mecanismos de autenticación de usuarios ni autorización de endpoints.
->    - **CI/CD**: No se ha implementado un pipeline de integración y despliegue continuo. Los despliegues se realizan manualmente a través de los comandos del Serverless Framework.
->    - **Monitoreo y Alarmas**: Carece de un sistema robusto de monitoreo de errores, observabilidad y alarmas proactivas.
->    - **Uso de Librerías y Frameworks**: Se ha omitido el uso de librerías como Express o Fastify, junto con sus respectivos plugins y extensiones, para la ejecución de la función Lambda, así como extensines de elaboración de documentación, ya que esto debe evaluarse con los líderes del proyecto. Diversos estudios e informes —como el State of Software Supply Chain 2024 de Sonatype y el Open Source Security and Risk Analysis Report de Synopsys— señalan que cada dependencia externa adicional incrementa la superficie de ataque y la probabilidad de vulnerabilidades o fallos de seguridad en el sistema.
+- **Esquema de Monorepo**: Este proyecto se ha estructurado como un monorepo para facilitar la prueba y la evaluación en un único repositorio. En un entorno de producción con un equipo de desarrollo más grande, es probable que los servicios (`appointment-api`, `appointment-processor`) y los paquetes (`core`, `infrastructure`) residan en repositorios separados para mejorar la autonomía de los equipos y la independencia de los despliegues.
+- **Prueba de Concepto**: Se debe entender que este proyecto es una prueba diseñada para corroborar los conocimientos técnicos requeridos para un rol específico. **No debe tomarse como base para una implementación en producción**, ya que carece de varios componentes críticos.
+- **Omisiones Deliberadas**: Para mantener el enfoque en la lógica de negocio principal, se han omitido intencionadamente los siguientes aspectos:
+- **Seguridad y Autenticación**: No hay mecanismos de autenticación de usuarios ni autorización de endpoints.
+- **CI/CD**: No se ha implementado un pipeline de integración y despliegue continuo. Los despliegues se realizan manualmente a través de los comandos del Serverless Framework.
+- **Monitoreo y Alarmas**: Carece de un sistema robusto de monitoreo de errores, observabilidad y alarmas proactivas.
+- **Uso de Librerías y Frameworks**: Se ha omitido el uso de librerías como Express o Fastify, junto con sus respectivos plugins y extensiones, para la ejecución de la función Lambda, así como extensines de elaboración de documentación, ya que esto debe evaluarse con los líderes del proyecto. Diversos estudios e informes —como el State of Software Supply Chain 2024 de Sonatype y el Open Source Security and Risk Analysis Report de Synopsys— señalan que cada dependencia externa adicional incrementa la superficie de ataque y la probabilidad de vulnerabilidades o fallos de seguridad en el sistema.
 
 ## Resumen de Funcionalidades
 
