@@ -2,6 +2,7 @@
 
 Este repositorio contiene un proyecto de prueba que implementa un sistema de agendamiento de citas médicas utilizando una arquitectura serverless en AWS. El sistema está diseñado como un monorepo para facilitar la evaluación y demostración de habilidades técnicas.
 
+
 ## Consideraciones Importantes
 
 Es fundamental tener en cuenta los siguientes puntos al evaluar este proyecto:
@@ -14,7 +15,7 @@ Es fundamental tener en cuenta los siguientes puntos al evaluar este proyecto:
 >    - **Seguridad y Autenticación**: No hay mecanismos de autenticación de usuarios ni autorización de endpoints.
 >    - **CI/CD**: No se ha implementado un pipeline de integración y despliegue continuo. Los despliegues se realizan manualmente a través de los comandos del Serverless Framework.
 >    - **Monitoreo y Alarmas**: Carece de un sistema robusto de monitoreo de errores, observabilidad y alarmas proactivas.
->    - **Uso de Librerías y Frameworks**: Se ha omitido el uso de librerías como Express o Fastify, junto con sus respectivos plugins y extensiones, para la ejecución de la función Lambda, así como la elaboración de documentación, ya que esto debe evaluarse con los líderes del proyecto. Diversos estudios e informes —como el State of Software Supply Chain 2024 de Sonatype y el Open Source Security and Risk Analysis Report de Synopsys— señalan que cada dependencia externa adicional incrementa la superficie de ataque y la probabilidad de vulnerabilidades o fallos de seguridad en el sistema.
+>    - **Uso de Librerías y Frameworks**: Se ha omitido el uso de librerías como Express o Fastify, junto con sus respectivos plugins y extensiones, para la ejecución de la función Lambda, así como extensines de elaboración de documentación, ya que esto debe evaluarse con los líderes del proyecto. Diversos estudios e informes —como el State of Software Supply Chain 2024 de Sonatype y el Open Source Security and Risk Analysis Report de Synopsys— señalan que cada dependencia externa adicional incrementa la superficie de ataque y la probabilidad de vulnerabilidades o fallos de seguridad en el sistema.
 
 ## Resumen de Funcionalidades
 
@@ -149,3 +150,19 @@ La solución está construida sobre los siguientes servicios de AWS, orquestados
 -   **Amazon SQS (Simple Queue Service)**: Para el encolamiento de mensajes, desacoplando la creación de la cita de su procesamiento y garantizando la entrega.
 -   **Amazon EventBridge**: Para un bus de eventos más avanzado que gestiona la comunicación entre los procesadores y el servicio de API para la actualización de estado.
 
+## Infraestructura como Código (IaC) con AWS CDK (Ejemplo)
+
+Adicionalmente a la configuración principal con **Serverless Framework**, este repositorio incluye una implementación completa de la infraestructura utilizando el **AWS Cloud Development Kit (CDK)**.  
+Los archivos correspondientes (`cdk.json`, `tsconfig.cdk.json`, y los directorios `bin/` y `lib/`) se encuentran en la raíz del proyecto.
+
+### Puntos Clave
+
+- **Propósito Demostrativo**:  
+  Esta implementación de CDK es un ejemplo y una prueba de concepto.  
+  No forma parte del flujo de despliegue principal del proyecto, el cual se gestiona exclusivamente a través de los comandos de **Serverless Framework** (`pnpm run deploy:api`, `pnpm run deploy:processor`).
+
+- **Infraestructura Equivalente**:  
+  El código en CDK tiene como objetivo replicar de manera idéntica la misma arquitectura definida en los archivos `serverless.yml` de los servicios `appointment-api` y `appointment-processor`.
+
+- **Evaluación Técnica**:  
+  Se incluye para demostrar la capacidad de definir y gestionar la infraestructura en la nube utilizando un enfoque alternativo, aprovechando las ventajas de un lenguaje de programación como **TypeScript**.
