@@ -179,6 +179,13 @@ export const UpdateAppointmentStatusEventSchema = z.object({
 });
 export type UpdateAppointmentStatusEventDto = z.infer<typeof UpdateAppointmentStatusEventSchema>;
 
+export const GetAppointmentRequestSchema = z.object({ 
+  insuredId: z.string().regex(/^[0-9]{5}$/, "El insuredId debe ser de 5 dígitos numéricos."), // [!code ++]
+  appointmentId: z.string().uuid("El appointmentId debe ser un UUID válido."), // [!code ++]
+});
+export type GetAppointmentRequestDto = z.infer<typeof GetAppointmentRequestSchema>; // [!code ++]
+
+
 // ===== Directory: packages/core/src/application/use-cases =====
 
 // CreateAppointment.ts
@@ -212,6 +219,47 @@ export class CreateAppointmentUseCase {
       }
     });
     
+    return appointment;
+  }
+}// GetAppointment.ts
+// packages/core/src/application/use-cases/GetAppointment.ts
+
+import { IAppointmentRepository } from '../../domain/ports/repositories/IAppointmentRepository';
+import { AppointmentResponseDto } from '../dtos/AppointmentDtos';
+import { NotFoundError } from '../../common/errors/AppError';
+
+interface GetAppointmentDto {
+  insuredId: string;
+  appointmentId: string;
+}
+
+/**
+ * @description Caso de uso para obtener los detalles de una cita específica.
+ */
+export class GetAppointmentUseCase {
+  /**
+   * @param appointmentRepository El repositorio para acceder a los datos de las citas.
+   */
+  constructor(
+    private readonly appointmentRepository: IAppointmentRepository
+  ) {}
+
+  /**
+   * Ejecuta el caso de uso.
+   * @param dto El DTO con los identificadores de la cita.
+   * @returns Una promesa que se resuelve con los datos de la cita.
+   * @throws {NotFoundError} Si la cita no se encuentra.
+   */
+  async execute(dto: GetAppointmentDto): Promise<AppointmentResponseDto> {
+    const appointment = await this.appointmentRepository.findById({
+      insuredId: dto.insuredId,
+      appointmentId: dto.appointmentId,
+    });
+
+    if (!appointment) {
+      throw new NotFoundError(`No se encontró la cita con ID ${dto.appointmentId}.`);
+    }
+
     return appointment;
   }
 }// ListAppointments.ts
@@ -510,8 +558,8 @@ import { Appointment } from "../../entities/Appointment";
 export interface IAppointmentRepository {
   save(appointment: Appointment): Promise<void>;
   findById(keys: { appointmentId: string, insuredId: string }): Promise<Appointment | null>; // [!code ++]
-  update(appointment: Appointment): Promise<void>; // [!code ++]
-  findByInsuredId(insuredId: string): Promise<Appointment[]>; // [!code ++]
+  update(appointment: Appointment): Promise<void>; 
+  findByInsuredId(insuredId: string): Promise<Appointment[]>;
 }
 
 // ===== Directory: packages/core =====
@@ -535,16 +583,15 @@ export interface IAppointmentRepository {
   "types": "dist/index.d.ts",
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.583.0",
-    "@aws-sdk/client-eventbridge": "^3.583.0",
+    "@aws-sdk/client-eventbridge": "^3.873.0",
     "@aws-sdk/client-sns": "^3.583.0",
     "@aws-sdk/lib-dynamodb": "^3.873.0",
     "@aws-sdk/util-dynamodb": "^3.583.0",
     "awilix": "^10.0.1",
-    "mysql2": "^3.9.7",
     "zod": "^4.0.17"
   },
   "devDependencies": {
-    "@types/mysql2": "github:types/mysql2"
+    
   }
 }
 
@@ -612,47 +659,60 @@ export function handleError(error: unknown) {
     }),
   };
 }// LambdaHandlerWrapper.ts
+// packages/infrastructure/src/common/LambdaHandlerWrapper.ts
+
 import { handleError } from './ErrorHandler';
 
 /**
- * Wrapper simple para los manejadores de Lambda.
- * Maneja tanto eventos HTTP (API Gateway) como eventos SQS de forma transparente.
+ * Wrapper para los manejadores de Lambda que abstrae el manejo de respuestas y errores.
+ * Detecta si el evento proviene de API Gateway (HTTP) o SQS y formatea la
+ * respuesta o maneja el error de la manera adecuada para cada servicio.
  */
 export const lambdaHandlerWrapper = (handler: Function) => async (event: any, context: any) => {
   try {
     console.log('Request Event:', JSON.stringify(event, null, 2));
     const result = await handler(event, context);
 
-    // Si el handler no retorna nada (típico en SQS), simplemente retornamos undefined
+    // Si el handler no retorna nada (típico en SQS), simplemente terminamos.
     if (result === undefined || result === null) {
       return;
     }
 
-    // Si ya es una respuesta HTTP formateada, la retornamos tal como está
-    if (typeof result === 'object' && result.statusCode && 'body' in result) {
-      return result;
-    }
-
-    // Si es para API Gateway (tiene requestContext), formateamos como respuesta HTTP
-    if (event.requestContext) {
+    // Si el resultado ya es una respuesta HTTP formateada, nos aseguramos
+    // de que el body sea un string JSON antes de devolverlo.
+    if (typeof result === 'object' && 'statusCode' in result && 'body' in result) {
       return {
-        statusCode: result.statusCode || 200,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(result.body !== undefined ? result.body : result),
+        ...result,
+        headers: {
+          "Content-Type": "application/json",
+          ...result.headers,
+        },
+        body: typeof result.body === 'string' ? result.body : JSON.stringify(result.body),
       };
     }
 
-    // Para cualquier otro caso, retornamos el resultado tal como está
+    // Si es un evento de API Gateway pero el handler solo devolvió el objeto del body,
+    // lo envolvemos en una respuesta HTTP 200 estándar.
+    if (event.requestContext) {
+      return {
+        statusCode: 200,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(result),
+      };
+    }
+
+    // Para cualquier otro tipo de invocación (ej. directa), retornamos el resultado tal cual.
     return result;
-    
   } catch (error: unknown) {
-    // Si es un evento SQS, re-lanzamos el error para que SQS maneje los reintentos
+    // Si el evento es de SQS, relanzamos el error para que SQS gestione los reintentos
+    // y eventualmente lo mueva a la DLQ.
     if (event.Records && Array.isArray(event.Records)) {
       console.error('SQS Handler Error:', error);
       throw error;
     }
     
-    // Para eventos HTTP, usamos nuestro manejador de errores
+    // Para eventos HTTP, usamos nuestro manejador centralizado para devolver
+    // una respuesta de error HTTP consistente.
     return handleError(error);
   }
 };
@@ -668,10 +728,12 @@ export const lambdaHandlerWrapper = (handler: Function) => async (event: any, co
  * Esto permite desacoplar la lógica de negocio de la infraestructura, facilitando
  * las pruebas y la mantenibilidad.
  */
+
 import { createContainer, asClass, InjectionMode } from 'awilix';
 import { CreateAppointmentUseCase } from '@core/application/use-cases/CreateAppointment';
 import { ListAppointmentsUseCase } from '@core/application/use-cases/ListAppointments';
 import { UpdateAppointmentStatusUseCase } from '@core/application/use-cases/UpdateAppointmentStatus';
+import { GetAppointmentUseCase } from '@core/application/use-cases/GetAppointment'; // [!code ++]
 // Importamos los nuevos casos de uso
 import { ProcessAppointmentPEUseCase } from '@core/application/use-cases/ProcessAppointmentPE';
 import { ProcessAppointmentCLUseCase } from '@core/application/use-cases/ProcessAppointmentCL';
@@ -681,7 +743,6 @@ import { DynamoDbAppointmentRepository } from '@infrastructure/persistence/dynam
 import { SnsEventPublisher } from '@infrastructure/messaging/SnsEventPublisher';
 import { AppointmentRdsRepository } from '@infrastructure/persistence/rds/AppointmentRdsRepository';
 import { EventBridgePublisher } from '@infrastructure/messaging/EventBridgePublisher';
-
 
 const container = createContainer({
   injectionMode: InjectionMode.CLASSIC,
@@ -699,6 +760,7 @@ container.register({
   // Casos de Uso
   createAppointmentUseCase: asClass(CreateAppointmentUseCase).singleton(),
   listAppointmentsUseCase: asClass(ListAppointmentsUseCase).singleton(),
+  getAppointmentUseCase: asClass(GetAppointmentUseCase).singleton(), // [!code ++]
   updateAppointmentStatusUseCase: asClass(UpdateAppointmentStatusUseCase).singleton(),
   
   // Registramos los nuevos casos de uso específicos y eliminamos el genérico
@@ -870,7 +932,6 @@ export class DynamoDbAppointmentRepository implements IAppointmentRepository {
 // ===== Directory: packages/infrastructure/src/persistence/rds =====
 
 // AppointmentRdsRepository.ts
-import { createPool, Pool } from 'mysql2/promise';
 import { Appointment } from '@core/domain/entities/Appointment';
 import { IAppointmentCountryRepository } from '@core/domain/ports/repositories/IAppointmentCountryRepository';
 
@@ -992,6 +1053,60 @@ describe('CreateAppointmentUseCase', () => {
     });
 
     expect(result).toEqual(savedAppointment);
+  });
+});// GetAppointment.test.ts
+// packages/test/core/application/use-cases/GetAppointment.test.ts
+
+import { GetAppointmentUseCase } from '@core/application/use-cases/GetAppointment';
+import { IAppointmentRepository } from '@core/domain/ports/repositories/IAppointmentRepository';
+import { Appointment } from '@core/domain/entities/Appointment';
+import { NotFoundError } from '@core/common/errors/AppError';
+
+describe('GetAppointmentUseCase', () => {
+  let appointmentRepository: jest.Mocked<IAppointmentRepository>;
+  let getAppointmentUseCase: GetAppointmentUseCase;
+
+  beforeEach(() => {
+    appointmentRepository = {
+      save: jest.fn(),
+      findById: jest.fn(),
+      update: jest.fn(),
+      findByInsuredId: jest.fn(),
+    };
+    getAppointmentUseCase = new GetAppointmentUseCase(appointmentRepository);
+  });
+
+  it('debe devolver los datos de una cita si se encuentra', async () => {
+    // Arrange
+    const dto = { insuredId: '12345', appointmentId: 'uuid-1' };
+    const mockAppointment: Appointment = {
+      ...dto,
+      scheduleId: 101,
+      countryISO: 'PE',
+      status: 'PENDING',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    appointmentRepository.findById.mockResolvedValue(mockAppointment);
+
+    // Act
+    const result = await getAppointmentUseCase.execute(dto);
+
+    // Assert
+    expect(appointmentRepository.findById).toHaveBeenCalledWith(dto);
+    expect(result).toEqual(mockAppointment);
+  });
+
+  it('debe lanzar un NotFoundError si la cita no se encuentra', async () => {
+    // Arrange
+    const dto = { insuredId: '12345', appointmentId: 'uuid-not-found' };
+    appointmentRepository.findById.mockResolvedValue(null);
+
+    // Act & Assert
+    await expect(getAppointmentUseCase.execute(dto)).rejects.toThrow(NotFoundError);
+    await expect(getAppointmentUseCase.execute(dto)).rejects.toThrow(
+      `No se encontró la cita con ID ${dto.appointmentId}.`
+    );
   });
 });// ListAppointments.test.ts
 import { ListAppointmentsUseCase } from '@core/application/use-cases/ListAppointments';
@@ -1344,13 +1459,40 @@ Esto levantará un servidor local. Los endpoints de la API estarán disponibles 
 
 ### Gestión de la Documentación (OpenAPI)
 
-El proyecto incluye un script para generar una especificación OpenAPI (`openapi.yaml`) a partir de los comentarios JSDoc en los handlers de la API.
+El proyecto incluye un script para generar una especificación OpenAPI (`openapi.yaml`) a partir del lo que esté definido en el archivo ./scripts/generate-openapi.ts.
 
 -   **Para generar el archivo `openapi.yaml`**, ejecute:
     ```bash
     pnpm run docs:generate
     ```
--   **Para añadir más documentación**, debe editar los comentarios JSDoc del archivo `services/appointment-api/src/handlers/appointment.ts`. El script `scripts/generate-openapi.ts` procesará estos comentarios para actualizar la especificación.
+
+### Acceso a la Documentación
+
+Una vez que la API está desplegada, puedes acceder a la documentación interactiva y a la especificación OpenAPI a través de los siguientes endpoints:
+
+-   **Swagger UI (Interfaz Interactiva)**: `https://<URL_BASE_DE_LA_API>/docs`
+-   **Especificación OpenAPI (YAML)**: `https://<URL_BASE_DE_LA_API>/openapi.yaml`
+
+Sustituye `<URL_BASE_DE_LA_API>` por la URL que recibiste por correo.
+
+### Endpoints Disponibles
+
+A continuación se detallan las rutas disponibles en la API:
+
+| Método | Ruta                                                                      |
+|--------|---------------------------------------------------------------------------|
+| POST   | `http://localhost:3000/appointments`                                      |
+| POST   | `http://localhost:3000/2015-03-31/functions/appointmentHandler/invocations` |
+| GET    | `http://localhost:3000/appointments/{insuredId}`                          |
+| POST   | `http://localhost:3000/2015-03-31/functions/appointmentHandler/invocations` |
+| GET    | `http://localhost:3000/appointments/{insuredId}/{appointmentId}`          |
+| POST   | `http://localhost:3000/2015-03-31/functions/appointmentHandler/invocations` |
+| GET    | `http://localhost:3000/docs`                                              |
+| POST   | `http://localhost:3000/2015-03-31/functions/swagger/invocations`          |
+| GET    | `http://localhost:3000/docs/{proxy*}`                                     |
+| POST   | `http://localhost:3000/2015-03-31/functions/swagger/invocations`          |
+| GET    | `http://localhost:3000/openapi.yaml`                                      |
+
 
 ### Despliegue en AWS
 
@@ -1367,6 +1509,18 @@ El proyecto se compone de dos servicios que deben desplegarse de forma independi
     ```
 
 Estos comandos utilizarán las credenciales de AWS configuradas en su entorno para provisionar toda la infraestructura necesaria a través de CloudFormation.
+
+## Pruebas de Endpoints con cURL
+
+Para verificar que la API desplegada funciona correctamente, puedes utilizar el script `scripts/test-api.sh`. Este script realiza una serie de peticiones cURL a los endpoints principales.
+
+**Uso:**
+
+```bash
+./scripts/test-api.sh <URL_BASE_DE_LA_API>
+```
+
+**Importante:** La `<URL_BASE_DE_LA_API>` es la URL raíz de la API desplegada en AWS. Esta URL te será enviada por correo electrónico una vez que la infraestructura esté lista.
 
 ## Estructura del Proyecto (Monorepo)
 
@@ -1473,6 +1627,45 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+  /appointments/{insuredId}/{appointmentId}:
+    get:
+      summary: Obtener una cita específica
+      description: Obtiene los detalles de una cita médica específica por su ID.
+      tags:
+        - Appointments
+      parameters:
+        - name: insuredId
+          in: path
+          required: true
+          schema: &a2
+            type: string
+            pattern: ^[0-9]{5}$
+        - name: appointmentId
+          in: path
+          required: true
+          schema: &a3
+            type: string
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000)$
+      responses:
+        "200":
+          description: Detalles de la cita obtenidos exitosamente.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AppointmentResponse"
+        "400":
+          description: Uno o más IDs son inválidos.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: La cita no fue encontrada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 components:
   schemas:
     CreateAppointmentRequest:
@@ -1503,6 +1696,16 @@ components:
         insuredId: *a1
       required:
         - insuredId
+      additionalProperties: false
+    GetAppointmentParams:
+      $schema: https://json-schema.org/draft/2020-12/schema
+      type: object
+      properties:
+        insuredId: *a2
+        appointmentId: *a3
+      required:
+        - insuredId
+        - appointmentId
       additionalProperties: false
     AppointmentResponse:
       $schema: https://json-schema.org/draft/2020-12/schema
@@ -1692,6 +1895,9 @@ functions:
       - httpApi:
           path: /appointments/{insuredId}
           method: get
+      - httpApi:
+          path: /appointments/{insuredId}/{appointmentId}
+          method: get
       - sqs:
           arn:
             Fn::GetAtt: [AppointmentsCompletionQueue, Arn]
@@ -1823,80 +2029,120 @@ resources:
 import { container } from '@infrastructure/di/container';
 import { lambdaHandlerWrapper } from '@infrastructure/common/LambdaHandlerWrapper';
 import { validateAndParse } from '@core/common/utils/validation';
-
-// Importamos solo los tipos que necesitamos
+import { AppError, ErrorCode, HttpStatusCode } from '@core/common/errors/AppError';
 import type { CreateAppointmentUseCase } from '@core/application/use-cases/CreateAppointment';
 import type { ListAppointmentsUseCase } from '@core/application/use-cases/ListAppointments';
 import type { UpdateAppointmentStatusUseCase } from '@core/application/use-cases/UpdateAppointmentStatus';
+import type { GetAppointmentUseCase } from '@core/application/use-cases/GetAppointment';
 
 import { 
   CreateAppointmentSchema, 
   ListAppointmentsRequestSchema, 
-  UpdateAppointmentStatusEventSchema 
+  UpdateAppointmentStatusEventSchema,
+  GetAppointmentRequestSchema 
 } from '@core/application/dtos/AppointmentDtos';
 
+// --- Controladores de Endpoints HTTP ---
+
 /**
- * @description Punto de entrada principal para la API de Citas.
- * Maneja tanto eventos HTTP (API Gateway) como eventos SQS de forma simple.
+ * Maneja la creación de una nueva cita.
+ * Corresponde a: POST /appointments
  */
-async function appointmentRouter(event: any) {
-  // ----- Ruta 1: Eventos HTTP (API Gateway) -----
-  if (event.requestContext?.http) {
-    const httpMethod = event.requestContext.http.method;
-
-    if (httpMethod === 'POST') {
-      const body = JSON.parse(event.body);
-      const dto = validateAndParse(CreateAppointmentSchema, body);
-
-      const useCase = container.resolve<CreateAppointmentUseCase>('createAppointmentUseCase');
-      const result = await useCase.execute(dto);
-
-      return {
-        statusCode: 202,
-        body: result,
-      };
-    }
-
-    if (httpMethod === 'GET') {
-      const { insuredId } = validateAndParse(ListAppointmentsRequestSchema, event.pathParameters || {});
-      
-      const useCase = container.resolve<ListAppointmentsUseCase>('listAppointmentsUseCase');
-      const result = await useCase.execute(insuredId);
-
-      return {
-        statusCode: 200,
-        body: result,
-      };
-    }
-
-    throw new Error(`Método HTTP no soportado: ${httpMethod}`);
-  }
-
-  // ----- Ruta 2: Eventos SQS -----
-  if (event.Records && Array.isArray(event.Records)) {
-    console.log('Processing SQS event for status update');
-    const useCase = container.resolve<UpdateAppointmentStatusUseCase>('updateAppointmentStatusUseCase');
-
-    for (const record of event.Records) {
-      const body = JSON.parse(record.body);
-      const eventDetail = body.detail;
-      
-      const validatedEvent = validateAndParse(UpdateAppointmentStatusEventSchema, eventDetail);
-
-      await useCase.execute({
-        appointmentId: validatedEvent.appointmentId,
-        insuredId: validatedEvent.insuredId,
-      });
-    }
-
-    // Para SQS, no necesitamos retornar nada
-    return;
-  }
-  
-  throw new Error('Tipo de evento no soportado');
+async function createAppointmentHandler(event: any) {
+  const body = JSON.parse(event.body);
+  const dto = validateAndParse(CreateAppointmentSchema, body);
+  const useCase = container.resolve<CreateAppointmentUseCase>('createAppointmentUseCase');
+  const result = await useCase.execute(dto);
+  return { statusCode: 202, body: result };
 }
 
-export const handler = lambdaHandlerWrapper(appointmentRouter);// swagger.ts
+/**
+ * Maneja la obtención de una cita específica por su ID.
+ * Corresponde a: GET /appointments/{insuredId}/{appointmentId}
+ */
+async function getAppointmentHandler(event: any) {
+  const dto = validateAndParse(GetAppointmentRequestSchema, event.pathParameters || {});
+  const useCase = container.resolve<GetAppointmentUseCase>('getAppointmentUseCase');
+  const result = await useCase.execute(dto);
+  return { statusCode: 200, body: result };
+}
+
+/**
+ * Maneja el listado de todas las citas de un asegurado.
+ * Corresponde a: GET /appointments/{insuredId}
+ */
+async function listAppointmentsHandler(event: any) {
+  const { insuredId } = validateAndParse(ListAppointmentsRequestSchema, event.pathParameters || {});
+  const useCase = container.resolve<ListAppointmentsUseCase>('listAppointmentsUseCase');
+  const result = await useCase.execute(insuredId);
+  return { statusCode: 200, body: result };
+}
+
+// --- Routers por Origen de Evento ---
+
+/**
+ * Enruta las peticiones HTTP al controlador adecuado basado en el método y los parámetros.
+ */
+async function handleHttpRequest(event: any) {
+  const method = event.requestContext.http.method;
+  const pathParameters = event.pathParameters || {};
+
+  if (method === 'POST') {
+    return createAppointmentHandler(event);
+  }
+
+  if (method === 'GET') {
+    // La ruta más específica (con appointmentId) se comprueba primero.
+    if (pathParameters.appointmentId) {
+      return getAppointmentHandler(event);
+    }
+    // La ruta general para listar.
+    if (pathParameters.insuredId) {
+      return listAppointmentsHandler(event);
+    }
+  }
+
+  throw new AppError(`Ruta no encontrada: ${method} ${event.rawPath}`, ErrorCode.NotFound, HttpStatusCode.NOT_FOUND);
+}
+
+/**
+ * Procesa los mensajes provenientes de la cola SQS para actualizar el estado de las citas.
+ */
+async function handleSqsRequest(event: any) {
+  console.log('Processing SQS event for status update');
+  const useCase = container.resolve<UpdateAppointmentStatusUseCase>('updateAppointmentStatusUseCase');
+
+  for (const record of event.Records) {
+    const body = JSON.parse(record.body);
+    const eventDetail = body.detail;
+    const validatedEvent = validateAndParse(UpdateAppointmentStatusEventSchema, eventDetail);
+    await useCase.execute({
+      appointmentId: validatedEvent.appointmentId,
+      insuredId: validatedEvent.insuredId,
+    });
+  }
+}
+
+// --- Handler Principal (Punto de Entrada) ---
+
+/**
+ * @description Punto de entrada principal para la Lambda.
+ * Delega el evento al router correspondiente según su origen (API Gateway o SQS).
+ */
+async function mainHandler(event: any) {
+  if (event.requestContext?.http) {
+    return handleHttpRequest(event);
+  }
+
+  if (event.Records && Array.isArray(event.Records)) {
+    await handleSqsRequest(event);
+    return; // Los manejadores de SQS no devuelven una respuesta HTTP.
+  }
+  
+  throw new AppError('Tipo de evento no soportado', ErrorCode.BadRequest, HttpStatusCode.BAD_REQUEST);
+}
+
+export const handler = lambdaHandlerWrapper(mainHandler);// swagger.ts
 import * as fs from 'fs';
 import * as path from 'path';
 
